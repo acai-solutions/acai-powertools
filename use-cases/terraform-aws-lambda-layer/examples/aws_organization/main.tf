@@ -110,6 +110,9 @@ module "use_case_1_lambda" {
 
 ## ---------------------------------------------------------------------------------------------------------------------
 # ¦ INVOKE LAMBDA FROM TERRAFORM
+# ¦ Uses terraform_data instead of data.aws_lambda_invocation to ensure
+# ¦ invocation happens during apply (after IAM policy updates), not during
+# ¦ the refresh/plan phase.
 ## ---------------------------------------------------------------------------------------------------------------------
 resource "time_sleep" "wait_for_lambda" {
   depends_on      = [module.use_case_1_lambda]
@@ -119,11 +122,25 @@ resource "time_sleep" "wait_for_lambda" {
   }
 }
 
-data "aws_lambda_invocation" "invoke_test_lambda" {
-  function_name = module.use_case_1_lambda.lambda.name
-  input         = jsonencode({ test = "terraform" })
-  depends_on    = [time_sleep.wait_for_lambda]
-  provider      = aws.org_mgmt
+resource "terraform_data" "invoke_test_lambda" {
+  depends_on = [time_sleep.wait_for_lambda]
+
+  triggers_replace = [
+    module.acai_powertools_lambda_layer.layer_arn,
+  ]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      aws lambda invoke \
+        --function-name ${module.use_case_1_lambda.lambda.name} \
+        --payload '{"test": "terraform"}' \
+        --region ${data.aws_region.current.name} \
+        --cli-binary-format raw-in-base64-out \
+        /tmp/lambda_invoke_result.json && \
+      echo "Lambda invocation result:" && \
+      cat /tmp/lambda_invoke_result.json
+    EOT
+  }
 }
 
 
@@ -139,6 +156,6 @@ subprocess.check_call(["aws", "logs", "filter-log-events", "--region", "${var.aw
     EOT
   }
   triggers = {
-    lambda_invoke = data.aws_lambda_invocation.invoke_test_lambda.result
+    lambda_invoke = terraform_data.invoke_test_lambda.id
   }
 }

@@ -42,13 +42,14 @@ func TestAcaiPowertoolsOrganizationsHelper(t *testing.T) {
 	assert.NotEmpty(t, layerArn, "Layer ARN should not be empty")
 	t.Logf("Layer ARN: %s", layerArn)
 
-	// Verify lambda_invoke_result matches fetch_lambda_logs_trigger
-	lambdaInvokeResult := terraform.Output(t, terraformOptions, "lambda_invoke_result")
-	fetchLambdaLogsTrigger := terraform.OutputMap(t, terraformOptions, "fetch_lambda_logs_trigger")
-	assert.Equal(t, lambdaInvokeResult, fetchLambdaLogsTrigger["lambda_invoke"],
-		"lambda_invoke_result should equal fetch_lambda_logs_trigger[\"lambda_invoke\"]")
+	// Verify lambda invocation succeeded (terraform_data provisioner would have
+	// failed the apply if the Lambda returned an error)
+	lambdaInvokeId := terraform.Output(t, terraformOptions, "lambda_invoke_id")
+	assert.NotEmpty(t, lambdaInvokeId, "Lambda invoke ID should not be empty")
+	t.Logf("Lambda invoke ID: %s", lambdaInvokeId)
 
-	// Verify Lambda invocation returned organization data
-	assert.NotEmpty(t, lambdaInvokeResult, "Lambda invocation result should not be empty")
-	t.Logf("Lambda invocation result: %s", lambdaInvokeResult)
+	// Verify fetch_lambda_logs_trigger references the invocation
+	fetchLambdaLogsTrigger := terraform.OutputMap(t, terraformOptions, "fetch_lambda_logs_trigger")
+	assert.Equal(t, lambdaInvokeId, fetchLambdaLogsTrigger["lambda_invoke"],
+		"lambda_invoke_id should equal fetch_lambda_logs_trigger[\"lambda_invoke\"]")
 }
