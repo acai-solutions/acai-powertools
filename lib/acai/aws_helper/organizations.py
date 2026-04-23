@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import boto3
-
 from acai.aws_helper.ou_path_resolver import OuPathResolver
 
 if TYPE_CHECKING:
