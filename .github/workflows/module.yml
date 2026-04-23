@@ -1,0 +1,50 @@
+name: ACAI Python Module
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+      - '**_cop'
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: write
+  security-events: write
+  id-token: write
+
+jobs:
+  # ── Module-Checks (Lint + Test + optional Copilot Autofix) ─────────
+  # Läuft auf: PRs → main, Pushes auf _ai Branches (iterative Fixes)
+  py_tf_module_checks:
+    uses: acai-solutions/github-workflows/.github/workflows/checks-py-hcl-module.yml@main
+    if: ${{ github.event_name == 'pull_request' || endsWith(github.ref_name, '_ai') }}
+    with:
+      py_version: "3.12"
+      py_source_path: lib
+      py_lint_include: true
+      py_lint_allow_failures: false
+      py_testing_include: true
+      py_test_modules: '["ai_embedding","ai_vector_store","logging","python_helper","storage","webcrawler","xml_parser"]'
+      py_test_extra_pip_packages: "lxml beautifulsoup4 selenium psycopg2-binary pgvector boto3 voyageai openai"
+      py_ai_autofix_include: true
+      hcl_docs_skip: true
+      hcl_test_beds: '["AWS", "AWS_ESC"]'
+      hcl_test_bed_aws_terratest_configs: '["aws/matrix_tf1x5x7_aws6x0x0.json", "aws/matrix_ofu1x6x0_aws6x0x0.json"]'
+      hcl_test_bed_aws_esc_terratest_configs: '["aws/matrix_tf1x14x0_aws6x29x0.json", "aws/matrix_ofu1x9x0_aws6x29x0_only.json"]'
+      #hcl_test_beds: '["AWS"]'
+      #hcl_test_bed_aws_terratest_configs: '["aws/matrix_tf1x5x7_aws6x0x0.json"]'
+      #hcl_test_bed_aws_esc_terratest_configs: '["aws/matrix_tf1x5x7_aws6x0x0.json"]'
+      hcl_terratest_path: "use-cases/terraform-aws-lambda-layer/tests/terratest"
+      hcl_terratest_examples_path: "use-cases/terraform-aws-lambda-layer/examples"
+      hcl_ai_autofix_include: true
+    secrets: inherit
+
+  module_release:
+    uses: acai-solutions/github-workflows/.github/workflows/hcl-module-release.yml@main
+    if: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+    secrets: inherit
