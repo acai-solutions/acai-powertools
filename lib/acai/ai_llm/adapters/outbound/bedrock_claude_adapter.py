@@ -36,7 +36,7 @@ class BedrockClaudeConfig(LlmConfig):
 class BedrockClaudeAdapter(LlmPort):
     """LLM adapter that calls Claude 3.5 Sonnet via Amazon Bedrock."""
 
-    VERSION: str = "1.1.4"  # inject_version
+    VERSION: str = "1.0.0"  # inject_version
 
     def __init__(
         self,

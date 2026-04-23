@@ -29,7 +29,7 @@ locals {
     }
   )
   aws_ssm_parameter_prefix = var.ssm_parameter_prefix == "" ? "" : "/${lower(var.ssm_parameter_prefix)}"
-  solution_version         = /*inject_version_start*/ "1.1.4" /*inject_version_end*/
+  solution_version         = /*inject_version_start*/ "1.0.0" /*inject_version_end*/
 }
 resource "aws_ssm_parameter" "product_version" {
   #checkov:skip=CKV2_AWS_34: AWS SSM Parameter should be Encrypted not required for module version

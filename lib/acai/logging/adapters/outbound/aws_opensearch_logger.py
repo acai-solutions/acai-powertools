@@ -24,7 +24,7 @@ class AwsOpenSearchLogger(LoggerPort):
     * **LOG_LEVEL** - Initial log level (DEBUG, INFO, …).
     """
 
-    VERSION: str = "1.1.4"  # inject_version
+    VERSION: str = "1.0.0"  # inject_version
 
     def __init__(
         self,

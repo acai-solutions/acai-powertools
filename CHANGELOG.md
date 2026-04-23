@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.0.0 (2026-04-23)
+
+
+### Features
+
+* initial version ([#1](https://github.com/acai-solutions/acai-powertools/issues/1)) ([0228278](https://github.com/acai-solutions/acai-powertools/commit/0228278760030d2cbdbaebb0045c5452c255cb01))
+
 ## [1.1.4](https://github.com/acai-solutions/acai-powertools/compare/1.1.3...1.1.4) (2026-04-22)
 
 

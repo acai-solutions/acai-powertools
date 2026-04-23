@@ -17,7 +17,7 @@ class EmbedderPort(ABC):
     Anthropic, …) implement it.
     """
 
-    VERSION: str = "1.1.4"  # inject_version
+    VERSION: str = "1.0.0"  # inject_version
 
     @abstractmethod
     def get_embedding(self, text: str) -> EmbeddingResult:
