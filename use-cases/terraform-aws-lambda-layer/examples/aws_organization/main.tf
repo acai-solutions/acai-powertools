@@ -71,6 +71,7 @@ data "aws_iam_policy_document" "organizations_read" {
       "organizations:ListOrganizationalUnitsForParent",
       "organizations:DescribeOrganizationalUnit",
       "organizations:ListChildren",
+      "organizations:ListParents",
       "organizations:ListTagsForResource",
       "organizations:DescribeAccount",
     ]
