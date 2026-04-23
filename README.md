@@ -38,6 +38,7 @@
 | [`ai_text_search`](lib/acai/ai_text_search/) | `TextSearchPort` | `PgFulltextSearchAdapter` | PostgreSQL native full-text search |
 | [`ai_vector_store`](lib/acai/ai_vector_store/) | `VectorStorePort` | `PgvectorStore` | pgvector-based similarity search |
 | [`logging`](lib/acai/logging/) | `LoggerPort` / `Loggable` | `ConsoleLogger`, `FileLogger`, `CloudWatchLogger` | Structured logging with context stack |
+| [`pdf_to_json`](lib/acai/pdf_to_json/) | `PdfParserPort` | `PyMuPdfParser` | PDF → structured JSON (text, images, tables) |
 | [`storage`](lib/acai/storage/) | `StoragePort` | `LocalFileStorage`, `S3Storage` (stub) | File persistence with atomic writes |
 | [`webcrawler`](lib/acai/webcrawler/) | `WebScraperPort` | `SeleniumScraper` | Web scraping with Selenium |
 | [`xml_parser`](lib/acai/xml_parser/) | `XmlParserPort` | `LxmlParser` | Swiss AKN legal-document parsing |
@@ -47,7 +48,7 @@
 | Module | Description |
 |--------|-------------|
 | [`ai_tools`](lib/acai/ai_tools/) | BM25 search index, text editor tool, Claude tool schemas |
-| [`boto3_helper`](lib/acai/boto3_helper/) | AWS SDK wrappers (sessions, STS, S3, CloudWatch, Organizations, SNS) |
+| [`aws_helper`](lib/acai/aws_helper/) | AWS SDK wrappers (sessions, STS, S3, CloudWatch, Organizations, OU path resolver, SNS) |
 | [`python_helper`](lib/acai/python_helper/) | Hashing, datetime conversion, JSON utilities |
 
 Each module has its own README with architecture details, quick start, and API reference.
@@ -87,15 +88,16 @@ acai-powertools/
 │       ├── ai_text_search/         # Hexagonal — PostgreSQL FTS
 │       ├── ai_vector_store/        # Hexagonal — pgvector store
 │       ├── logging/                # Hexagonal — structured logging
+│       ├── pdf_to_json/            # Hexagonal — PDF parsing to JSON
 │       ├── storage/                # Hexagonal — file persistence
 │       ├── webcrawler/             # Hexagonal — Selenium scraping
 │       ├── xml_parser/             # Hexagonal — AKN XML parsing
 │       ├── ai_tools/               # Utility — BM25, text editor, schemas
-│       ├── boto3_helper/           # Utility — AWS SDK wrappers
+│       ├── aws_helper/             # Utility — AWS SDK wrappers
 │       └── python_helper/          # Utility — general helpers
 └── use-cases/
     ├── terraform-aws-lambda-layer/ # Terraform module + build script for Lambda layer
-    └── example-1/                  # Demo: logging + storage usage
+    └── local-example-1/            # Demo: logging + storage usage
 ```
 
 ### Hexagonal module layout
@@ -204,7 +206,6 @@ See [LICENSE][license-url] for full details.
 
 [acai-shield]: https://img.shields.io/badge/maintained_by-acai.gmbh-CB224B?style=flat
 [acai-url]: https://acai.gmbh
-[module-version-shield]: https://img.shields.io/badge/module_version-1.1.4-CB224B?style=flat
 [module-version-shield]: https://img.shields.io/badge/module_version-1.1.4-CB224B?style=flat
 [terraform-tested-shield]: https://img.shields.io/badge/terraform-%3E%3D1.5.7_tested-844FBA?style=flat&logo=terraform&logoColor=white
 [opentofu-tested-shield]: https://img.shields.io/badge/opentofu-%3E%3D1.6_tested-FFDA18?style=flat&logo=opentofu&logoColor=black
