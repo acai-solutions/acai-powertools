@@ -289,9 +289,7 @@ class OrganizationsHelper(OuPathResolver):
             return self.ou_name_with_path_cache[direct_parent_ou_id]
 
         direct_parent_ou_name = (
-            "root"
-            if parent_type == "ROOT"
-            else self._get_ou_name(direct_parent_ou_id)
+            "root" if parent_type == "ROOT" else self._get_ou_name(direct_parent_ou_id)
         )
         parent_ou_id = direct_parent_ou_id
 

@@ -37,9 +37,7 @@ class OuPathResolver:
             # raises ValueError if the current session belongs to a different org
         """
         found_root_ou_id = next(iter(self.roots), None)
-        if (expected_org_id != self.org_id) or (
-            expected_root_ou_id not in self.roots
-        ):
+        if (expected_org_id != self.org_id) or (expected_root_ou_id not in self.roots):
             raise ValueError(
                 f"Not in the correct AWS Org. Required: {expected_org_id}/{expected_root_ou_id} "
                 f"Found: {self.org_id}/{found_root_ou_id}"
@@ -74,9 +72,7 @@ class OuPathResolver:
         self.logger.info(f"OU tree contains {len(result)} nodes")
         return result
 
-    def resolve_ou_paths(
-        self, ou_paths: list[str]
-    ) -> dict[str, dict[str, str]]:
+    def resolve_ou_paths(self, ou_paths: list[str]) -> dict[str, dict[str, str]]:
         """Resolve OU path strings to OU IDs with metadata.
 
         Accepts a list of OU paths and returns a dict keyed by resolved path name.
@@ -144,7 +140,7 @@ class OuPathResolver:
                         "ou_id_path": f"{self.org_id}/{root_ou_id}",
                     }
             else:
-                normalized = path[len("/root"):]
+                normalized = path[len("/root") :]
                 ous = self._resolve_ous_by_path(
                     root_ou_id, normalized, "/root", f"{self.org_id}/{root_ou_id}"
                 )
@@ -241,9 +237,7 @@ class OuPathResolver:
                 if len(input_parts) == len(key_parts) and all(
                     i == k or i == "*" for i, k in zip(input_parts, key_parts)
                 ):
-                    target = ou_results.setdefault(
-                        key, {**info, "assignments": []}
-                    )
+                    target = ou_results.setdefault(key, {**info, "assignments": []})
                     target["assignments"].extend(assignments_list)
 
         self.logger.info(f"Resolved {len(ou_results)} OU targets")
@@ -427,9 +421,7 @@ def _assume_remote_role(remote_role_arn: str) -> boto3.Session:
         logging.getLogger(__name__).error(
             "Failed to assume role %s: %s", remote_role_arn, e
         )
-        raise RuntimeError(
-            f"Was not able to assume role {remote_role_arn}"
-        ) from e
+        raise RuntimeError(f"Was not able to assume role {remote_role_arn}") from e
     return boto3.Session(
         aws_access_key_id=response["Credentials"]["AccessKeyId"],
         aws_secret_access_key=response["Credentials"]["SecretAccessKey"],
