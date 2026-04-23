@@ -25,7 +25,7 @@ The following ACAI PowerTools modules can be included:
 | `ai_text_search` | `logging` | Text search functionality |
 | `ai_tools` | None | AI utility tools |
 | `ai_vector_store` | `logging` | Vector store operations |
-| `boto3_helper` | `logging` | AWS boto3 helpers |
+| `aws_helper` | `logging` | AWS boto3 helpers |
 | `logging` | `storage` | Logging utilities |
 | `python_helper` | None | Python utility functions |
 | `storage` | `logging` | Storage operations |
@@ -45,7 +45,7 @@ module "acai_powertools_layer" {
     description              = "ACAI PowerTools with logging and boto3"
     compatible_runtimes      = ["python3.12"]
     compatible_architectures = ["arm64"]
-    acai_modules             = ["logging", "boto3_helper"]
+    acai_modules             = ["logging", "aws_helper"]
   }
 }
 ```
@@ -82,7 +82,7 @@ module "acai_powertools_layer" {
     description              = "ACAI PowerTools with extra pip packages"
     compatible_runtimes      = ["python3.12"]
     compatible_architectures = ["arm64"]
-    acai_modules             = ["logging", "boto3_helper"]
+    acai_modules             = ["logging", "aws_helper"]
     pip_requirements = [
       "aws-lambda-powertools==2.43.1",
       "requests==2.32.3",
@@ -275,7 +275,7 @@ layer_settings = {
 - `description`: Optional, recommended for clarity
 - `compatible_runtimes`: Required, must be valid Python runtimes (e.g., "python3.12")
 - `compatible_architectures`: Required, e.g., "arm64" or "x86_64"
-- `acai_modules`: Optional, defaults to `["boto3_helper", "logging", "python_helper", "storage"]`
+- `acai_modules`: Optional, defaults to `["aws_helper", "logging", "python_helper", "storage"]`
   - Only known module names allowed
   - Dependencies are automatically resolved and included
 - `pip_requirements`: Optional, defaults to `[]`. Each entry is a **pip
@@ -336,7 +336,7 @@ output "layer_version" {
 ├── python/
 │   ├── acai/             # ACAI modules
 │   │   ├── logging/
-│   │   ├── boto3_helper/
+│   │   ├── aws_helper/
 │   │   └── ...
 │   ├── requests/         # pip packages (when pip_requirements is set)
 │   ├── urllib3/
@@ -374,7 +374,7 @@ Instead of single large layer with all modules:
 ```hcl
 # Good: Separate concern
 module "core_layer" {
-  acai_modules = ["logging", "boto3_helper"]
+  acai_modules = ["logging", "aws_helper"]
 }
 
 module "ai_layer" {
@@ -388,7 +388,7 @@ layer_settings = {
   layer_name = "acai-core"
   description = "Core ACAI modules: logging, boto3 helpers, Python utilities"
   # ...
-  acai_modules = ["logging", "boto3_helper", "python_helper"]
+  acai_modules = ["logging", "aws_helper", "python_helper"]
 }
 ```
 
@@ -429,7 +429,7 @@ your-repo/
 ├── lib/
 │   └── acai/
 │       ├── logging/
-│       ├── boto3_helper/
+│       ├── aws_helper/
 │       └── ...
 └── use-cases/
     └── terraform-aws-lambda-layer/

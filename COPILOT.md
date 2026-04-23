@@ -57,7 +57,7 @@ acai/<module>/
 
 ### Non-hexagonal utility modules
 
-`ai_tools`, `boto3_helper`, `python_helper` — flat utility code without hexagonal structure. Each must still have an `__init__.py` with a docstring and `__all__`.
+`ai_tools`, `aws_helper`, `python_helper` — flat utility code without hexagonal structure. Each must still have an `__init__.py` with a docstring and `__all__`.
 
 ## Dependency & API Rules
 

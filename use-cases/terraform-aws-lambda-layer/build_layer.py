@@ -41,7 +41,7 @@ DEPENDENCY_MAP: dict[str, list[str]] = {
     "ai_text_search": ["logging"],
     "ai_tools": [],
     "ai_vector_store": ["logging"],
-    "boto3_helper": ["logging"],
+    "aws_helper": ["logging"],
     "logging": ["storage"],
     "python_helper": [],
     "storage": ["logging"],

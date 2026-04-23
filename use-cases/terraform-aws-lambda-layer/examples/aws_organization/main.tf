@@ -38,7 +38,7 @@ locals {
     layer_name               = "acai-powertools-organizations"
     compatible_runtimes      = ["python3.12"]
     compatible_architectures = ["arm64"]
-    acai_modules             = ["boto3_helper"]
+    acai_modules             = ["aws_helper"]
     skip_destroy             = false # Allow cleanup in test/dev environments
   }
 }

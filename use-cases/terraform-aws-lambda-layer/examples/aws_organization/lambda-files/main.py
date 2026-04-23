@@ -7,7 +7,7 @@ AWS Organizations hierarchy, accounts, and organizational units.
 
 import json
 
-from acai.boto3_helper.organizations import OrganizationsHelper
+from acai.aws_helper.organizations import OrganizationsHelper
 from acai.logging import LoggerConfig, LoggerContext, LogLevel, create_lambda_logger
 
 # Initialize logger

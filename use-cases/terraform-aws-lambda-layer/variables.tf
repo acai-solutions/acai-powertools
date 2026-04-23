@@ -6,7 +6,7 @@ variable "layer_settings" {
     compatible_runtimes      = list(string)
     compatible_architectures = list(string)
     acai_modules = optional(list(string), [
-      "boto3_helper",
+      "aws_helper",
       "logging",
       "python_helper",
       "storage"
@@ -20,11 +20,11 @@ variable "layer_settings" {
     condition = alltrue([
       for m in var.layer_settings.acai_modules : contains([
         "ai_embedding", "ai_hybrid_search", "ai_llm", "ai_text_search",
-        "ai_tools", "ai_vector_store", "boto3_helper", "logging",
+        "ai_tools", "ai_vector_store", "aws_helper", "logging",
         "python_helper", "storage", "webcrawler", "xml_parser"
       ], m)
     ])
-    error_message = "Each module must be one of: ai_embedding, ai_hybrid_search, ai_llm, ai_text_search, ai_tools, ai_vector_store, boto3_helper, logging, python_helper, storage, webcrawler, xml_parser."
+    error_message = "Each module must be one of: ai_embedding, ai_hybrid_search, ai_llm, ai_text_search, ai_tools, ai_vector_store, aws_helper, logging, python_helper, storage, webcrawler, xml_parser."
   }
 
   validation {
