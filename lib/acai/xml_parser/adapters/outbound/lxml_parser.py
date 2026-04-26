@@ -1,4 +1,4 @@
-"""Concrete XML parser adapter based on lxml for Akoma Ntoso (AKN) documents."""
+"""Concrete XML parser adapter based on lxml."""
 
 from __future__ import annotations
 
@@ -20,10 +20,11 @@ if TYPE_CHECKING:
 
 
 class LxmlParser(XmlParserPort):
-    """AKN XML parser implemented with *lxml*.
+    """XML parser implemented with *lxml*.
 
-    Handles namespace discovery, article extraction, heading collection
-    and metadata enrichment for Swiss federal law documents.
+    All tag names, namespace resolution order, metadata attribute names, and the
+    depth offset are driven by :class:`XmlParserConfig`, so the adapter is not
+    tied to any particular XML dialect.
     """
 
     VERSION: str = "1.0.0"  # inject_version
@@ -88,13 +89,12 @@ class LxmlParser(XmlParserPort):
     ) -> LawMetadata:
         try:
             lang = self._config.language
-            law_number = self._find_attr(root, "FRBRnumber", "value", nsmap)
-            law_name = self._find_attr(
-                root, f"FRBRname[@xml:lang='{lang}']", "value", nsmap
+            lang_tag = f"{self._config.law_name_element}[@xml:lang='{lang}']"
+            law_number = self._find_attr(
+                root, self._config.law_number_element, self._config.law_number_attr, nsmap
             )
-            short_form = self._find_attr(
-                root, f"FRBRname[@xml:lang='{lang}']", "shortForm", nsmap
-            )
+            law_name = self._find_attr(root, lang_tag, self._config.law_name_attr, nsmap)
+            short_form = self._find_attr(root, lang_tag, self._config.short_form_attr, nsmap)
             return LawMetadata(
                 law_number=law_number,
                 law_name=law_name,
@@ -111,18 +111,17 @@ class LxmlParser(XmlParserPort):
         attr: str,
         nsmap: Dict[str, str],
     ) -> Optional[str]:
-        for ns_prefix in ("akn", "default"):
-            if ns_prefix not in nsmap:
+        for ns in self._config.namespace_search_order:
+            if ns not in nsmap:
                 continue
             try:
-                elem = root.find(f".//{ns_prefix}:{tag}", namespaces=nsmap)
+                elem = root.find(f".//{ns}:{tag}", namespaces=nsmap)
                 if elem is not None:
                     return elem.get(attr)
             except Exception:
                 self._logger.debug(
-                    f"Namespace {ns_prefix} lookup failed for {tag}", exc_info=True
+                    f"Namespace {ns} lookup failed for {tag}", exc_info=True
                 )
-                continue
         return None
 
     # ------------------------------------------------------------------
@@ -198,13 +197,15 @@ class LxmlParser(XmlParserPort):
     def _find_articles_via_body(
         self, root: etree._Element, nsmap: Dict[str, str]
     ) -> list[Any]:
-        for ns in ("akn", "default"):
+        article_tag = self._config.article_tag
+        body_tag = self._config.body_tag
+        for ns in self._config.namespace_search_order:
             if ns not in nsmap:
                 continue
             try:
-                bodies = root.xpath(f".//{ns}:body", namespaces=nsmap)
+                bodies = root.xpath(f".//{ns}:{body_tag}", namespaces=nsmap)
                 if bodies:
-                    articles = bodies[0].xpath(f".//{ns}:article", namespaces=nsmap)
+                    articles = bodies[0].xpath(f".//{ns}:{article_tag}", namespaces=nsmap)
                     if articles:
                         self._logger.debug(
                             f"Found {len(articles)} articles via body ({ns})"
@@ -214,17 +215,17 @@ class LxmlParser(XmlParserPort):
                 self._logger.debug(
                     f"Article search via body ({ns}) failed", exc_info=True
                 )
-                continue
         return []
 
     def _find_articles_direct(
         self, root: etree._Element, nsmap: Dict[str, str]
     ) -> list[Any]:
-        for ns in ("akn", "default"):
+        article_tag = self._config.article_tag
+        for ns in self._config.namespace_search_order:
             if ns not in nsmap:
                 continue
             try:
-                articles = root.xpath(f".//{ns}:article", namespaces=nsmap)
+                articles = root.xpath(f".//{ns}:{article_tag}", namespaces=nsmap)
                 if articles:
                     self._logger.debug(
                         f"Found {len(articles)} articles via direct search ({ns})"
@@ -234,14 +235,13 @@ class LxmlParser(XmlParserPort):
                 self._logger.debug(
                     f"Direct article search ({ns}) failed", exc_info=True
                 )
-                continue
         return []
 
     def _find_articles_no_namespace(
         self, root: etree._Element, nsmap: Dict[str, str]
     ) -> list[Any]:
         try:
-            articles = root.xpath("//article")
+            articles = root.xpath(f"//{self._config.article_tag}")
             if articles:
                 self._logger.debug("Found articles without namespace")
                 return articles
@@ -252,15 +252,17 @@ class LxmlParser(XmlParserPort):
     def _find_articles_preamble(
         self, root: etree._Element, nsmap: Dict[str, str]
     ) -> list[Any]:
-        for ns in ("akn", "default"):
+        article_tag = self._config.article_tag
+        preamble_tag = self._config.preamble_tag
+        for ns in self._config.namespace_search_order:
             if ns not in nsmap:
                 continue
             try:
-                preambles = root.xpath(f".//{ns}:preamble", namespaces=nsmap)
+                preambles = root.xpath(f".//{ns}:{preamble_tag}", namespaces=nsmap)
                 if not preambles:
                     continue
                 preamble = preambles[0]
-                articles = preamble.xpath(f".//{ns}:article", namespaces=nsmap)
+                articles = preamble.xpath(f".//{ns}:{article_tag}", namespaces=nsmap)
                 if articles:
                     self._logger.debug(
                         f"Found {len(articles)} articles in preamble ({ns})"
@@ -274,7 +276,6 @@ class LxmlParser(XmlParserPort):
                 self._logger.debug(
                     f"Preamble article search ({ns}) failed", exc_info=True
                 )
-                continue
         return []
 
     def _get_article_identifier(
@@ -288,28 +289,28 @@ class LxmlParser(XmlParserPort):
         return article_id
 
     def _get_article_number(self, elem: etree._Element, nsmap: Dict[str, str]) -> str:
-        for ns in ("akn", "default"):
+        num_tag = self._config.num_tag
+        for ns in self._config.namespace_search_order:
             if ns not in nsmap:
                 continue
             try:
-                num_elem = elem.find(f"./{ns}:num", namespaces=nsmap)
+                num_elem = elem.find(f"./{ns}:{num_tag}", namespaces=nsmap)
                 if num_elem is not None:
                     return self._text_content(num_elem).strip()
             except Exception:
                 self._logger.debug(
                     f"Article number extraction ({ns}) failed", exc_info=True
                 )
-                continue
         return elem.get("id") or elem.get("eId") or ""
 
     def _get_paragraphs(self, elem: etree._Element, nsmap: Dict[str, str]) -> List[str]:
         paragraphs: List[str] = []
         seen: Set[str] = set()
 
-        for ns in ("akn", "default"):
+        for ns in self._config.namespace_search_order:
             if ns not in nsmap:
                 continue
-            for tag in ("paragraph", "p", "content"):
+            for tag in self._config.paragraph_tags:
                 try:
                     for child in elem.xpath(f".//{ns}:{tag}", namespaces=nsmap):
                         text = self._text_content(child).strip()
@@ -320,7 +321,6 @@ class LxmlParser(XmlParserPort):
                     self._logger.debug(
                         f"Paragraph extraction ({ns}:{tag}) failed", exc_info=True
                     )
-                    continue
 
         if not paragraphs:
             text = self._text_content(elem).strip()
@@ -332,20 +332,21 @@ class LxmlParser(XmlParserPort):
     def _get_headings_up_to_element(
         self, elem: etree._Element, nsmap: Dict[str, str]
     ) -> List[str]:
+        heading_tag = self._config.heading_tag
+        num_tag = self._config.num_tag
         headings: List[str] = []
         current: Optional[etree._Element] = elem
         while current is not None:
             heading_text = ""
             num_text = ""
-            # Try 'default' namespace for headings (matches original behaviour)
-            for ns in ("default", "akn"):
+            for ns in self._config.namespace_search_order:
                 if ns not in nsmap:
                     continue
                 try:
-                    h = current.find(f"./{ns}:heading", namespaces=nsmap)
+                    h = current.find(f"./{ns}:{heading_tag}", namespaces=nsmap)
                     if h is not None:
                         heading_text = self._text_content(h).strip()
-                        n = current.find(f"./{ns}:num", namespaces=nsmap)
+                        n = current.find(f"./{ns}:{num_tag}", namespaces=nsmap)
                         if n is not None:
                             num_text = self._text_content(n).strip()
                         break
@@ -353,21 +354,19 @@ class LxmlParser(XmlParserPort):
                     self._logger.debug(
                         f"Heading extraction ({ns}) failed", exc_info=True
                     )
-                    continue
             if heading_text:
                 full = (num_text + " " + heading_text).strip()
                 headings.append(full)
             current = current.getparent()
         return headings[::-1]
 
-    @staticmethod
-    def _get_depth(elem: etree._Element) -> int:
+    def _get_depth(self, elem: etree._Element) -> int:
         depth = 0
         parent = elem.getparent()
         while parent is not None:
             depth += 1
             parent = parent.getparent()
-        return depth - 3
+        return depth - self._config.depth_offset
 
     @staticmethod
     def _text_content(elem: etree._Element) -> str:
