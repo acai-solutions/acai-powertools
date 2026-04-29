@@ -81,7 +81,7 @@ class LocalLlmAdapter(LlmPort):
         )
     """
 
-    VERSION: str = "1.0.0"  # inject_version
+    VERSION: str = "1.0.6"  # inject_version
 
     def __init__(
         self,

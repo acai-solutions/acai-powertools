@@ -32,7 +32,7 @@ class VoyageAIConfig(EmbedderConfig):
 class VoyageAIEmbedder(EmbedderPort):
     """Adapter for generating text embeddings via the Voyage AI service."""
 
-    VERSION: str = "1.0.0"  # inject_version
+    VERSION: str = "1.0.6"  # inject_version
 
     def __init__(self, logger: Loggable, config: VoyageAIConfig):
         self.config = config

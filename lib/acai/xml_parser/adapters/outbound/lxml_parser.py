@@ -26,7 +26,7 @@ class LxmlParser(XmlParserPort):
     and metadata enrichment for Swiss federal law documents.
     """
 
-    VERSION: str = "1.0.0"  # inject_version
+    VERSION: str = "1.0.6"  # inject_version
 
     def __init__(
         self,

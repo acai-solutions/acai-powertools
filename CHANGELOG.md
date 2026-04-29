@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.6](https://github.com/acai-solutions/acai-powertools/compare/1.0.5...1.0.6) (2026-04-29)
+
+
+### Bug Fixes
+
+* add a logging adapter for grafana ([#4](https://github.com/acai-solutions/acai-powertools/issues/4)) ([db0e53d](https://github.com/acai-solutions/acai-powertools/commit/db0e53dc8b15a8b5c94f616c303d096b2d54bc1d))
+
 ## 1.0.0 (2026-04-23)
 
 
