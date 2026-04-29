@@ -140,9 +140,7 @@ class GrafanaCloudLogger(LoggerPort):
         exc_info = kwargs.pop("exc_info", None)
 
         for key, value in kwargs.items():
-            attributes.append(
-                {"key": key, "value": {"stringValue": str(value)}}
-            )
+            attributes.append({"key": key, "value": {"stringValue": str(value)}})
 
         body = message
         if exc_info:
@@ -156,9 +154,7 @@ class GrafanaCloudLogger(LoggerPort):
             "attributes": attributes,
         }
 
-    def _build_otlp_payload(
-        self, records: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def _build_otlp_payload(self, records: List[Dict[str, Any]]) -> Dict[str, Any]:
         resource_attributes = [
             {"key": k, "value": {"stringValue": v}}
             for k, v in self._resource_attrs.items()
