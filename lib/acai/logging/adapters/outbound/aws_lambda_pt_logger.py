@@ -24,17 +24,29 @@ class AwsLambdaPtLogger(LoggerPort):
     and CloudWatch Logs Insights integration is desired.
     """
 
-    VERSION: str = "1.0.5"
+    VERSION: str = "1.0.6"  # inject_version
 
     def __init__(
         self,
         service: str = "my-service",
         level: Union[LogLevel, int, str, None] = None,
+        use_powertools: bool | None = None,
     ):
-        if _HAS_POWERTOOLS:
+        # Decide whether to use Powertools for this instance.
+        # Defaults to whether the library is importable; callers may force it
+        # off to get plain stdlib output even when Powertools is installed.
+        self._use_powertools = (
+            _HAS_POWERTOOLS
+            if use_powertools is None
+            else (use_powertools and _HAS_POWERTOOLS)
+        )
+        if self._use_powertools:
             self._logger = PowerToolsLogger(service=service)
         else:
             self._logger = logging.getLogger(service)
+            # Don't propagate to root: the AWS Lambda runtime attaches its own
+            # handler to the root logger which would emit each record twice.
+            self._logger.propagate = False
             if not self._logger.handlers:
                 handler = logging.StreamHandler()
                 handler.setFormatter(
@@ -56,28 +68,44 @@ class AwsLambdaPtLogger(LoggerPort):
         else:
             self._logger.setLevel(native)
 
+    # Reserved stdlib `logging` parameters that must be forwarded to
+    # `_logger.log(...)` directly rather than being registered as
+    # structured log keys (Powertools' formatter would try `value % record_dict`
+    # on them and crash with e.g. `TypeError: bool % dict`).
+    _RESERVED_LOG_KWARGS = frozenset({"exc_info", "stack_info", "stacklevel", "extra"})
+
     def log(
         self, level: Union[LogLevel, int, str], message: str, **kwargs: Any
     ) -> None:
         native = self._to_native(level)
         caller_location = self._get_caller_location()
-        if _HAS_POWERTOOLS and kwargs:
+
+        # Split kwargs: reserved stdlib logging args vs. structured-data extras.
+        reserved = {
+            k: kwargs.pop(k) for k in list(kwargs) if k in self._RESERVED_LOG_KWARGS
+        }
+        # Caller-supplied stacklevel must not override our internal frame skip.
+        reserved.pop("stacklevel", None)
+
+        if self._use_powertools and kwargs:
             # PowerToolsLogger: append extra keys as structured data,
             # then remove them after logging to avoid leaking state.
             self._logger.append_keys(location=caller_location, **kwargs)
-            self._logger.log(native, message, stacklevel=self._STACKLEVEL)
+            self._logger.log(native, message, stacklevel=self._STACKLEVEL, **reserved)
             self._logger.remove_keys(["location"] + list(kwargs.keys()))
         elif kwargs:
             # stdlib fallback: include extras in the message
             extras = " ".join(f"{k}={v}" for k, v in kwargs.items())
-            self._logger.log(native, f"{message} | {extras}")
+            self._logger.log(native, f"{message} | {extras}", **reserved)
         else:
-            if _HAS_POWERTOOLS:
+            if self._use_powertools:
                 self._logger.append_keys(location=caller_location)
-                self._logger.log(native, message, stacklevel=self._STACKLEVEL)
+                self._logger.log(
+                    native, message, stacklevel=self._STACKLEVEL, **reserved
+                )
                 self._logger.remove_keys(["location"])
             else:
-                self._logger.log(native, message)
+                self._logger.log(native, message, **reserved)
 
     # ── helpers ───────────────────────────────────────────────────────
 

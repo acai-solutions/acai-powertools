@@ -1,6 +1,3 @@
-from .console_logger import ConsoleLogger
-from .file_logger import FileLogger
-
 __all__ = [
     "ConsoleLogger",
     "AwsLambdaPtLogger",
@@ -15,6 +12,8 @@ __all__ = [
 ]
 
 _LAZY = {
+    "ConsoleLogger": ".console_logger",
+    "FileLogger": ".file_logger",
     "AwsLambdaPtLogger": ".aws_lambda_pt_logger",
     "CloudWatchLogger": ".cloudwatch_logger",
     "AwsOpenSearchLogger": ".aws_opensearch_logger",

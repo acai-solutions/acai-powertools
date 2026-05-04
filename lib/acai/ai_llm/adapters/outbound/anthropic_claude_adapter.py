@@ -180,6 +180,56 @@ class AnthropicClaudeAdapter(LlmPort):
 
         raise ModelInvocationError(f"Anthropic API error: {last_exc}") from last_exc
 
+    def _call_structured_api_with_retries(
+        self, kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Call Anthropic API for structured response with retry logic."""
+        import anthropic as _anthropic
+
+        last_exc: Exception | None = None
+        for attempt in range(self.config.max_retries + 1):
+            if (
+                attempt == self.config.fallback_after_retries
+                and self.config.fallback_model_name
+            ):
+                kwargs["model"] = self.config.fallback_model_name
+
+            try:
+                response = self.client.messages.create(**kwargs)
+                tool_block = next(
+                    (b for b in response.content if b.type == "tool_use"),
+                    None,
+                )
+                if tool_block is None:
+                    raise ModelInvocationError(
+                        "Anthropic response did not contain a tool_use block"
+                    )
+                return {
+                    "response": tool_block.input,
+                    "usage": {
+                        "input_tokens": response.usage.input_tokens,
+                        "output_tokens": response.usage.output_tokens,
+                    },
+                    "model": response.model,
+                    "stop_reason": response.stop_reason,
+                }
+            except _anthropic.APIStatusError as exc:
+                if exc.status_code != 529:
+                    raise ModelInvocationError(f"Anthropic API error: {exc}") from exc
+                last_exc = exc
+                if attempt < self.config.max_retries:
+                    delay = self.config.retry_base_delay * (2**attempt)
+                    self.logger.warning(
+                        "Anthropic API overloaded, retrying",
+                        attempt=attempt + 1,
+                        delay=delay,
+                    )
+                    time.sleep(delay)
+
+        raise ModelInvocationError(
+            f"Anthropic API error after retries: {last_exc}"
+        ) from last_exc
+
     def get_response(
         self,
         prompt: str,
@@ -248,4 +298,59 @@ class AnthropicClaudeAdapter(LlmPort):
             raise
         except Exception as exc:
             self.logger.error("Anthropic API error", error=str(exc))
+            raise ModelInvocationError(f"Anthropic API error: {exc}") from exc
+
+    def get_structured_response(
+        self,
+        prompt: str,
+        schema: dict[str, Any],
+        tool_name: str = "extract",
+        tool_description: str = "",
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> dict[str, Any]:
+        """Call Anthropic Messages API with tool-use to get structured output.
+
+        The schema is passed as ``input_schema`` of a tool definition.
+        ``tool_choice`` forces the model to use that specific tool,
+        guaranteeing structured JSON output conforming to the schema.
+        """
+        try:
+            self._validate_input(prompt)
+            self.logger.debug(
+                "Generating structured response",
+                prompt_length=len(prompt),
+                model=self.config.model_name,
+                tool_name=tool_name,
+            )
+
+            kwargs: dict[str, Any] = {
+                "model": self.config.model_name,
+                "max_tokens": max_tokens or self.config.max_tokens,
+                "temperature": (
+                    temperature if temperature is not None else self.config.temperature
+                ),
+                "messages": [{"role": "user", "content": prompt}],
+                "tools": [
+                    {
+                        "name": tool_name,
+                        "description": tool_description
+                        or f"Structured extraction via {tool_name}",
+                        "input_schema": schema,
+                    }
+                ],
+                "tool_choice": {"type": "tool", "name": tool_name},
+            }
+            if system_prompt:
+                kwargs["system"] = system_prompt
+
+            return self._call_structured_api_with_retries(kwargs)
+
+        except (TextTooLongError, ValueError):
+            raise
+        except ModelInvocationError:
+            raise
+        except Exception as exc:
+            self.logger.error("Anthropic structured API error", error=str(exc))
             raise ModelInvocationError(f"Anthropic API error: {exc}") from exc
