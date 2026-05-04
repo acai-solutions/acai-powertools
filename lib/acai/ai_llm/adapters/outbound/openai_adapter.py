@@ -164,6 +164,61 @@ class OpenAIAdapter(LlmPort):
 
         raise ModelInvocationError(f"OpenAI API error: {last_exc}") from last_exc
 
+    def _call_structured_api_with_retries(
+        self, kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Call OpenAI API for structured response with retry logic."""
+        import json as _json
+
+        import openai as _openai
+
+        last_exc: Exception | None = None
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                response = self.client.chat.completions.create(**kwargs)
+                choice = response.choices[0]
+                usage = response.usage
+
+                if not choice.message.tool_calls:
+                    raise ModelInvocationError(
+                        "OpenAI response did not contain tool_calls"
+                    )
+
+                tool_call = choice.message.tool_calls[0]
+                parsed = _json.loads(tool_call.function.arguments)
+
+                input_tokens = usage.prompt_tokens if usage else 0
+                output_tokens = usage.completion_tokens if usage else 0
+                input_cost = input_tokens * self.config.price_per_input_token
+                output_cost = output_tokens * self.config.price_per_output_token
+
+                return {
+                    "response": parsed,
+                    "usage": {
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "input_cost": round(input_cost, 6),
+                        "output_cost": round(output_cost, 6),
+                        "total_cost": round(input_cost + output_cost, 6),
+                    },
+                    "model": response.model,
+                    "stop_reason": choice.finish_reason,
+                }
+            except _openai.RateLimitError as exc:
+                last_exc = exc
+                if attempt < self.config.max_retries:
+                    delay = self.config.retry_base_delay * (2**attempt)
+                    self.logger.warning(
+                        "OpenAI rate limited, retrying",
+                        attempt=attempt + 1,
+                        delay=delay,
+                    )
+                    time.sleep(delay)
+                else:
+                    self.logger.error("OpenAI rate limited after all retries")
+
+        raise ModelInvocationError(f"OpenAI API error: {last_exc}") from last_exc
+
     def get_response(
         self,
         prompt: str,
@@ -251,10 +306,6 @@ class OpenAIAdapter(LlmPort):
         The schema is passed as ``parameters`` of a function tool with
         ``strict: true``, guaranteeing the response matches the schema exactly.
         """
-        import json as _json
-
-        import openai as _openai
-
         try:
             self._validate_input(prompt)
             self.logger.debug(
@@ -294,54 +345,7 @@ class OpenAIAdapter(LlmPort):
                 },
             }
 
-            last_exc: Exception | None = None
-            for attempt in range(self.config.max_retries + 1):
-                try:
-                    response = self.client.chat.completions.create(**kwargs)
-                    choice = response.choices[0]
-                    usage = response.usage
-
-                    if not choice.message.tool_calls:
-                        raise ModelInvocationError(
-                            "OpenAI response did not contain tool_calls"
-                        )
-
-                    tool_call = choice.message.tool_calls[0]
-                    parsed = _json.loads(tool_call.function.arguments)
-
-                    input_tokens = usage.prompt_tokens if usage else 0
-                    output_tokens = usage.completion_tokens if usage else 0
-                    input_cost = input_tokens * self.config.price_per_input_token
-                    output_cost = output_tokens * self.config.price_per_output_token
-
-                    return {
-                        "response": parsed,
-                        "usage": {
-                            "input_tokens": input_tokens,
-                            "output_tokens": output_tokens,
-                            "input_cost": round(input_cost, 6),
-                            "output_cost": round(output_cost, 6),
-                            "total_cost": round(input_cost + output_cost, 6),
-                        },
-                        "model": response.model,
-                        "stop_reason": choice.finish_reason,
-                    }
-                except _openai.RateLimitError as exc:
-                    last_exc = exc
-                    if attempt < self.config.max_retries:
-                        import time
-
-                        delay = self.config.retry_base_delay * (2**attempt)
-                        self.logger.warning(
-                            "OpenAI rate limited, retrying",
-                            attempt=attempt + 1,
-                            delay=delay,
-                        )
-                        time.sleep(delay)
-                    else:
-                        self.logger.error("OpenAI rate limited after all retries")
-
-            raise ModelInvocationError(f"OpenAI API error: {last_exc}") from last_exc
+            return self._call_structured_api_with_retries(kwargs)
 
         except (TextTooLongError, ValueError):
             raise
