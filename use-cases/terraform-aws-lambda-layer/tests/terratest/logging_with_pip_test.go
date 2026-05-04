@@ -1,12 +1,15 @@
 package test
 
 import (
+	"encoding/json"
 	"fmt"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAcaiPowertoolsLambdaLayerWithPip(t *testing.T) {
@@ -35,7 +38,14 @@ func TestAcaiPowertoolsLambdaLayerWithPip(t *testing.T) {
 	terraform.InitAndApply(t, terraformOptions)
 
 	// Retrieve and validate the module output
-	output := terraform.OutputMap(t, terraformOptions, "acai_powertools_module")
+	rawModuleJson := terraform.OutputJson(t, terraformOptions, "acai_powertools_module")
+	var outputRaw map[string]interface{}
+	require.NoError(t, json.NewDecoder(strings.NewReader(rawModuleJson)).Decode(&outputRaw),
+		"Failed to parse acai_powertools_module output as JSON")
+	output := make(map[string]string)
+	for k, v := range outputRaw {
+		output[k] = fmt.Sprintf("%v", v)
+	}
 
 	// Assert that the layer ARN is present
 	layerArn, ok := output["layer_arn"]
@@ -47,7 +57,11 @@ func TestAcaiPowertoolsLambdaLayerWithPip(t *testing.T) {
 	// (proves the pip-installed aws-lambda-powertools is loadable from the layer
 	// and that the version pinned in requirements.txt is what was bundled)
 	expectedPowertoolsVersion := "2.43.1"
-	lambdaInvokeResult := terraform.Output(t, terraformOptions, "lambda_invoke_result")
+	rawLambdaJson := terraform.OutputJson(t, terraformOptions, "lambda_invoke_result")
+	var lambdaRaw interface{}
+	require.NoError(t, json.NewDecoder(strings.NewReader(rawLambdaJson)).Decode(&lambdaRaw),
+		"Failed to parse lambda_invoke_result output as JSON")
+	lambdaInvokeResult := fmt.Sprintf("%v", lambdaRaw)
 	t.Logf("Lambda invocation result: %s", lambdaInvokeResult)
 
 	assert.Contains(t, lambdaInvokeResult, "powertools_version",
