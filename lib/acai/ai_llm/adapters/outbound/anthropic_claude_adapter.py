@@ -215,9 +215,7 @@ class AnthropicClaudeAdapter(LlmPort):
                 }
             except _anthropic.APIStatusError as exc:
                 if exc.status_code != 529:
-                    raise ModelInvocationError(
-                        f"Anthropic API error: {exc}"
-                    ) from exc
+                    raise ModelInvocationError(f"Anthropic API error: {exc}") from exc
                 last_exc = exc
                 if attempt < self.config.max_retries:
                     delay = self.config.retry_base_delay * (2**attempt)
