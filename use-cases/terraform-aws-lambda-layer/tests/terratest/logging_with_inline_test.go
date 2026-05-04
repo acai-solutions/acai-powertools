@@ -33,18 +33,14 @@ func TestAcaiPowertoolsLambdaLayerWithInline(t *testing.T) {
 	defer terraform.Destroy(t, terraformOptions)
 	terraform.InitAndApply(t, terraformOptions)
 
-	// Retrieve and validate the module output
-	output := terraform.OutputMap(t, terraformOptions, "acai_powertools_module")
-
 	// Assert that the layer ARN is present
-	layerArn, ok := output["layer_arn"]
-	assert.True(t, ok, "Expected layer_arn in output")
+	layerArn := outputClean(t, terraformOptions, "acai_powertools_layer_arn")
 	assert.NotEmpty(t, layerArn, "Layer ARN should not be empty")
 	t.Logf("Layer ARN: %s", layerArn)
 
 	// Verify the Lambda invocation result confirms the inline-injected
 	// helper module is loadable from the layer at /opt/python/acme/...
-	lambdaInvokeResult := terraform.Output(t, terraformOptions, "lambda_invoke_result")
+	lambdaInvokeResult := outputRawClean(t, terraformOptions, "lambda_invoke_result")
 	t.Logf("Lambda invocation result: %s", lambdaInvokeResult)
 
 	assert.Contains(t, lambdaInvokeResult, "factory_module_path",

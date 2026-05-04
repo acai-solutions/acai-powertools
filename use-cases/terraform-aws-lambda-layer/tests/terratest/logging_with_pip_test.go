@@ -34,12 +34,8 @@ func TestAcaiPowertoolsLambdaLayerWithPip(t *testing.T) {
 	defer terraform.Destroy(t, terraformOptions)
 	terraform.InitAndApply(t, terraformOptions)
 
-	// Retrieve and validate the module output
-	output := terraform.OutputMap(t, terraformOptions, "acai_powertools_module")
-
 	// Assert that the layer ARN is present
-	layerArn, ok := output["layer_arn"]
-	assert.True(t, ok, "Expected layer_arn in output")
+	layerArn := outputClean(t, terraformOptions, "acai_powertools_layer_arn")
 	assert.NotEmpty(t, layerArn, "Layer ARN should not be empty")
 	t.Logf("Layer ARN: %s", layerArn)
 
@@ -47,7 +43,7 @@ func TestAcaiPowertoolsLambdaLayerWithPip(t *testing.T) {
 	// (proves the pip-installed aws-lambda-powertools is loadable from the layer
 	// and that the version pinned in requirements.txt is what was bundled)
 	expectedPowertoolsVersion := "2.43.1"
-	lambdaInvokeResult := terraform.Output(t, terraformOptions, "lambda_invoke_result")
+	lambdaInvokeResult := outputRawClean(t, terraformOptions, "lambda_invoke_result")
 	t.Logf("Lambda invocation result: %s", lambdaInvokeResult)
 
 	assert.Contains(t, lambdaInvokeResult, "powertools_version",

@@ -34,18 +34,18 @@ func TestAcaiPowertoolsOrganizationsHelper(t *testing.T) {
 	terraform.InitAndApply(t, terraformOptions)
 
 	// Assert that the layer ARN is present
-	layerArn := terraform.Output(t, terraformOptions, "acai_powertools_layer_arn")
+	layerArn := outputClean(t, terraformOptions, "acai_powertools_layer_arn")
 	assert.NotEmpty(t, layerArn, "Layer ARN should not be empty")
 	t.Logf("Layer ARN: %s", layerArn)
 
 	// Verify lambda invocation succeeded (terraform_data provisioner would have
 	// failed the apply if the Lambda returned an error)
-	lambdaInvokeId := terraform.Output(t, terraformOptions, "lambda_invoke_id")
+	lambdaInvokeId := outputClean(t, terraformOptions, "lambda_invoke_id")
 	assert.NotEmpty(t, lambdaInvokeId, "Lambda invoke ID should not be empty")
 	t.Logf("Lambda invoke ID: %s", lambdaInvokeId)
 
 	// Verify fetch_lambda_logs_trigger references the invocation
-	fetchLambdaLogsTrigger := terraform.OutputMap(t, terraformOptions, "fetch_lambda_logs_trigger")
+	fetchLambdaLogsTrigger := outputMapClean(t, terraformOptions, "fetch_lambda_logs_trigger")
 	assert.Equal(t, lambdaInvokeId, fetchLambdaLogsTrigger["lambda_invoke"],
 		"lambda_invoke_id should equal fetch_lambda_logs_trigger[\"lambda_invoke\"]")
 }
