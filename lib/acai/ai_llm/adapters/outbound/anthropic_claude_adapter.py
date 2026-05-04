@@ -180,6 +180,58 @@ class AnthropicClaudeAdapter(LlmPort):
 
         raise ModelInvocationError(f"Anthropic API error: {last_exc}") from last_exc
 
+    def _call_structured_api_with_retries(
+        self, kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Call Anthropic API for structured response with retry logic."""
+        import anthropic as _anthropic
+
+        last_exc: Exception | None = None
+        for attempt in range(self.config.max_retries + 1):
+            if (
+                attempt == self.config.fallback_after_retries
+                and self.config.fallback_model_name
+            ):
+                kwargs["model"] = self.config.fallback_model_name
+
+            try:
+                response = self.client.messages.create(**kwargs)
+                tool_block = next(
+                    (b for b in response.content if b.type == "tool_use"),
+                    None,
+                )
+                if tool_block is None:
+                    raise ModelInvocationError(
+                        "Anthropic response did not contain a tool_use block"
+                    )
+                return {
+                    "response": tool_block.input,
+                    "usage": {
+                        "input_tokens": response.usage.input_tokens,
+                        "output_tokens": response.usage.output_tokens,
+                    },
+                    "model": response.model,
+                    "stop_reason": response.stop_reason,
+                }
+            except _anthropic.APIStatusError as exc:
+                if exc.status_code != 529:
+                    raise ModelInvocationError(
+                        f"Anthropic API error: {exc}"
+                    ) from exc
+                last_exc = exc
+                if attempt < self.config.max_retries:
+                    delay = self.config.retry_base_delay * (2**attempt)
+                    self.logger.warning(
+                        "Anthropic API overloaded, retrying",
+                        attempt=attempt + 1,
+                        delay=delay,
+                    )
+                    time.sleep(delay)
+
+        raise ModelInvocationError(
+            f"Anthropic API error after retries: {last_exc}"
+        ) from last_exc
+
     def get_response(
         self,
         prompt: str,
@@ -266,8 +318,6 @@ class AnthropicClaudeAdapter(LlmPort):
         ``tool_choice`` forces the model to use that specific tool,
         guaranteeing structured JSON output conforming to the schema.
         """
-        import json as _json
-
         try:
             self._validate_input(prompt)
             self.logger.debug(
@@ -297,56 +347,7 @@ class AnthropicClaudeAdapter(LlmPort):
             if system_prompt:
                 kwargs["system"] = system_prompt
 
-            import anthropic as _anthropic
-
-            last_exc: Exception | None = None
-            for attempt in range(self.config.max_retries + 1):
-                if (
-                    attempt == self.config.fallback_after_retries
-                    and self.config.fallback_model_name
-                ):
-                    kwargs["model"] = self.config.fallback_model_name
-
-                try:
-                    response = self.client.messages.create(**kwargs)
-                    # Extract tool_use block
-                    tool_block = next(
-                        (b for b in response.content if b.type == "tool_use"),
-                        None,
-                    )
-                    if tool_block is None:
-                        raise ModelInvocationError(
-                            "Anthropic response did not contain a tool_use block"
-                        )
-                    return {
-                        "response": tool_block.input,
-                        "usage": {
-                            "input_tokens": response.usage.input_tokens,
-                            "output_tokens": response.usage.output_tokens,
-                        },
-                        "model": response.model,
-                        "stop_reason": response.stop_reason,
-                    }
-                except _anthropic.APIStatusError as exc:
-                    if exc.status_code != 529:
-                        raise ModelInvocationError(
-                            f"Anthropic API error: {exc}"
-                        ) from exc
-                    last_exc = exc
-                    if attempt < self.config.max_retries:
-                        delay = self.config.retry_base_delay * (2**attempt)
-                        self.logger.warning(
-                            "Anthropic API overloaded, retrying",
-                            attempt=attempt + 1,
-                            delay=delay,
-                        )
-                        import time
-
-                        time.sleep(delay)
-
-            raise ModelInvocationError(
-                f"Anthropic API error after retries: {last_exc}"
-            ) from last_exc
+            return self._call_structured_api_with_retries(kwargs)
 
         except (TextTooLongError, ValueError):
             raise

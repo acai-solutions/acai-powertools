@@ -26,7 +26,7 @@ import json
 import os
 import platform as _platform
 import shutil
-import subprocess
+import subprocess  # nosec B404
 import sys
 import tempfile
 import zipfile
@@ -237,7 +237,7 @@ def install_pip_packages(
     if python_version:
         print(f"  Python version:  {python_version}")
 
-    result = subprocess.run(cmd, check=False)
+    result = subprocess.run(cmd, check=False)  # nosec B603
     if result.returncode != 0:
         print("ERROR: pip install failed.", file=sys.stderr)
         sys.exit(1)
