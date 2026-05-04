@@ -252,6 +252,7 @@ class OpenAIAdapter(LlmPort):
         ``strict: true``, guaranteeing the response matches the schema exactly.
         """
         import json as _json
+
         import openai as _openai
 
         try:
