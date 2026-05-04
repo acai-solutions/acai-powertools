@@ -39,7 +39,7 @@ func TestAcaiPowertoolsLambdaLayer(t *testing.T) {
 	t.Logf("Layer ARN: %s", layerArn)
 
 	// Verify lambda_invoke_result matches fetch_lambda_logs_trigger
-	lambdaInvokeResult := outputRawClean(t, terraformOptions, "lambda_invoke_result")
+	lambdaInvokeResult := outputClean(t, terraformOptions, "lambda_invoke_result")
 	fetchLambdaLogsTrigger := outputMapClean(t, terraformOptions, "fetch_lambda_logs_trigger")
 	assert.Equal(t, lambdaInvokeResult, fetchLambdaLogsTrigger["lambda_invoke"],
 		"lambda_invoke_result should equal fetch_lambda_logs_trigger[\"lambda_invoke\"]")
