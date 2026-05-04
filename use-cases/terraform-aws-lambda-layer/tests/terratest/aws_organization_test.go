@@ -33,12 +33,8 @@ func TestAcaiPowertoolsOrganizationsHelper(t *testing.T) {
 	defer terraform.Destroy(t, terraformOptions)
 	terraform.InitAndApply(t, terraformOptions)
 
-	// Retrieve and validate the module output
-	output := terraform.OutputMap(t, terraformOptions, "acai_powertools_module")
-
 	// Assert that the layer ARN is present
-	layerArn, ok := output["layer_arn"]
-	assert.True(t, ok, "Expected layer_arn in output")
+	layerArn := terraform.Output(t, terraformOptions, "acai_powertools_layer_arn")
 	assert.NotEmpty(t, layerArn, "Layer ARN should not be empty")
 	t.Logf("Layer ARN: %s", layerArn)
 
