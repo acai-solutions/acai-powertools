@@ -36,7 +36,9 @@ class AwsLambdaPtLogger(LoggerPort):
         # Defaults to whether the library is importable; callers may force it
         # off to get plain stdlib output even when Powertools is installed.
         self._use_powertools = (
-            _HAS_POWERTOOLS if use_powertools is None else (use_powertools and _HAS_POWERTOOLS)
+            _HAS_POWERTOOLS
+            if use_powertools is None
+            else (use_powertools and _HAS_POWERTOOLS)
         )
         if self._use_powertools:
             self._logger = PowerToolsLogger(service=service)
@@ -89,9 +91,7 @@ class AwsLambdaPtLogger(LoggerPort):
             # PowerToolsLogger: append extra keys as structured data,
             # then remove them after logging to avoid leaking state.
             self._logger.append_keys(location=caller_location, **kwargs)
-            self._logger.log(
-                native, message, stacklevel=self._STACKLEVEL, **reserved
-            )
+            self._logger.log(native, message, stacklevel=self._STACKLEVEL, **reserved)
             self._logger.remove_keys(["location"] + list(kwargs.keys()))
         elif kwargs:
             # stdlib fallback: include extras in the message

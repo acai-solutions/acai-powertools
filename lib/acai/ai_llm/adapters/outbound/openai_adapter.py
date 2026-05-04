@@ -280,7 +280,8 @@ class OpenAIAdapter(LlmPort):
                         "type": "function",
                         "function": {
                             "name": tool_name,
-                            "description": tool_description or f"Structured extraction via {tool_name}",
+                            "description": tool_description
+                            or f"Structured extraction via {tool_name}",
                             "parameters": schema,
                             "strict": True,
                         },
@@ -328,6 +329,7 @@ class OpenAIAdapter(LlmPort):
                     last_exc = exc
                     if attempt < self.config.max_retries:
                         import time
+
                         delay = self.config.retry_base_delay * (2**attempt)
                         self.logger.warning(
                             "OpenAI rate limited, retrying",
@@ -338,9 +340,7 @@ class OpenAIAdapter(LlmPort):
                     else:
                         self.logger.error("OpenAI rate limited after all retries")
 
-            raise ModelInvocationError(
-                f"OpenAI API error: {last_exc}"
-            ) from last_exc
+            raise ModelInvocationError(f"OpenAI API error: {last_exc}") from last_exc
 
         except (TextTooLongError, ValueError):
             raise

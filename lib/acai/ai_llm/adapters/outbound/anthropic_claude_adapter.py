@@ -287,7 +287,8 @@ class AnthropicClaudeAdapter(LlmPort):
                 "tools": [
                     {
                         "name": tool_name,
-                        "description": tool_description or f"Structured extraction via {tool_name}",
+                        "description": tool_description
+                        or f"Structured extraction via {tool_name}",
                         "input_schema": schema,
                     }
                 ],
@@ -340,6 +341,7 @@ class AnthropicClaudeAdapter(LlmPort):
                             delay=delay,
                         )
                         import time
+
                         time.sleep(delay)
 
             raise ModelInvocationError(
