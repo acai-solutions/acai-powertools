@@ -10,7 +10,7 @@ from acai.xml_parser.domain.xml_models import ParsedLawDocument
 class XmlParserPort(ABC):
     """Outbound port defining the contract every XML parser adapter must fulfil."""
 
-    VERSION: str = "1.0.6"  # inject_version
+    VERSION: str = "1.0.7"  # inject_version
 
     @abstractmethod
     def parse(self, xml_path: Union[str, Path]) -> ParsedLawDocument:

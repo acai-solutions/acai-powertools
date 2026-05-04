@@ -23,7 +23,7 @@ class SeleniumScraper(WebScraperPort):
     Driven adapter implementing ``WebScraperPort``.
     """
 
-    VERSION: str = "1.0.6"  # inject_version
+    VERSION: str = "1.0.7"  # inject_version
 
     def __init__(self, logger: Loggable, config: Optional[WebConfig] = None) -> None:
         self._logger = logger

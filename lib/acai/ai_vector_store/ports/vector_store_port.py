@@ -15,7 +15,7 @@ class VectorStorePort(ABC):
     on this interface; concrete adapters (pgvector, in-memory, …) implement it.
     """
 
-    VERSION: str = "1.0.6"  # inject_version
+    VERSION: str = "1.0.7"  # inject_version
 
     @abstractmethod
     def upsert(self, records: list[VectorRecord]) -> int:

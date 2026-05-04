@@ -26,7 +26,7 @@ class MultiLogger(LoggerPort):
         logger.info("booted")          # sent to all three adapters
     """
 
-    VERSION: str = "1.0.6"  # inject_version
+    VERSION: str = "1.0.7"  # inject_version
 
     def __init__(self, loggers: List[LoggerPort]) -> None:
         self.loggers = loggers

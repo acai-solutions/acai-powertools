@@ -25,7 +25,7 @@ class OpenAIAdaConfig(EmbedderConfig):
 class OpenAIAdaEmbedder(EmbedderPort):
     """Adapter for generating text embeddings using OpenAI text-embedding-ada-002."""
 
-    VERSION: str = "1.0.6"  # inject_version
+    VERSION: str = "1.0.7"  # inject_version
 
     def __init__(self, logger: Loggable, config: OpenAIAdaConfig):
         self.config = config

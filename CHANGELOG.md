@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.7](https://github.com/acai-solutions/acai-powertools/compare/1.0.6...1.0.7) (2026-05-04)
+
+
+### Bug Fixes
+
+* Get structured response, Refined Logging ([#5](https://github.com/acai-solutions/acai-powertools/issues/5)) ([3c4b13e](https://github.com/acai-solutions/acai-powertools/commit/3c4b13e29e8a9c1350e1b9af05cd19196d922455)), closes [#6](https://github.com/acai-solutions/acai-powertools/issues/6)
+
 ## [1.0.6](https://github.com/acai-solutions/acai-powertools/compare/1.0.5...1.0.6) (2026-04-29)
 
 
