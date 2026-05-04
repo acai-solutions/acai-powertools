@@ -1,9 +1,13 @@
 {
-  "bucket"                      : "aws-testbed-terraform-state",
-  "region"                      : "eu-central-1",
-  "key"                         : "terratest/terraform.tfstate",
-  "use_lockfile"                 : true,
-  "skip_region_validation"      : true,
-  "skip_credentials_validation" : true,
-  "skip_metadata_api_check"     : true
+  bucket                      : aws-testbed-terraform-state,
+  dynamodb_table              : aws-testbed-terraform-locks,
+  region                      : eu-central-1,
+  key                         : terratest/terraform.tfstate,
+  skip_region_validation      : true,
+  skip_credentials_validation : true,
+  skip_metadata_api_check     : true,
+  endpoint                    : https://s3.eu-central-1.amazonaws.com,
+  sts_endpoint                : https://sts.eu-central-1.amazonaws.com,
+  dynamodb_endpoint           : https://dynamodb.eu-central-1.amazonaws.com
 }
+
