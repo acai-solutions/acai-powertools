@@ -1,11 +1,13 @@
 package test
 
 import (
+	"encoding/json"
 	"os/exec"
 	"testing"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAcaiPowertoolsLambdaLayer(t *testing.T) {
@@ -43,7 +45,10 @@ func TestAcaiPowertoolsLambdaLayer(t *testing.T) {
 	t.Logf("Layer ARN: %s", layerArn)
 
 	// Verify lambda_invoke_result matches fetch_lambda_logs_trigger
-	lambdaInvokeResult := terraform.Output(t, terraformOptions, "lambda_invoke_result")
+	rawLambdaJson := terraform.OutputJson(t, terraformOptions, "lambda_invoke_result")
+	var lambdaInvokeResult string
+	require.NoError(t, json.Unmarshal([]byte(rawLambdaJson), &lambdaInvokeResult),
+		"Failed to parse lambda_invoke_result as JSON string")
 	fetchLambdaLogsTrigger := terraform.OutputMap(t, terraformOptions, "fetch_lambda_logs_trigger")
 	assert.Equal(t, lambdaInvokeResult, fetchLambdaLogsTrigger["lambda_invoke"],
 		"lambda_invoke_result should equal fetch_lambda_logs_trigger[\"lambda_invoke\"]")
