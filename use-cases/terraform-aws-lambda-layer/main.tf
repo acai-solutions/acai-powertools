@@ -29,9 +29,17 @@ locals {
     }
   )
   aws_ssm_parameter_prefix = var.ssm_parameter_prefix == "" ? "" : "/${lower(var.ssm_parameter_prefix)}"
-  solution_version         = /*inject_version_start*/ "1.0.9" /*inject_version_end*/
+  solution_version         = /*inject_version_start*/ "1.1.4" /*inject_version_end*/
 }
 resource "aws_ssm_parameter" "product_version" {
+  # The parameter name is global per ssm_parameter_prefix. When this module
+  # is instantiated more than once in the same workspace (e.g. a standalone
+  # layer plus an account-cache layer in PROVISIO), concurrent PutParameter
+  # calls on the same name surface as `TooManyUpdates`. Consumers with
+  # multiple instances must disable the parameter on all but one instance
+  # via `create_product_version_ssm_parameter = false`.
+  count = var.create_product_version_ssm_parameter ? 1 : 0
+
   #checkov:skip=CKV2_AWS_34: AWS SSM Parameter should be Encrypted not required for module version
   # Note: this parameter is created in the provider's default region only,
   # even when var.regions is used to publish the layer in multiple regions.

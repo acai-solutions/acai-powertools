@@ -140,7 +140,7 @@ class OuPathResolver:
                         "ou_id_path": f"{self.org_id}/{root_ou_id}",
                     }
             else:
-                normalized = path[len("/root") :]
+                normalized = path[len("/root") :]  # noqa: E203 (black slice spacing)
                 ous = self._resolve_ous_by_path(
                     root_ou_id, normalized, "/root", f"{self.org_id}/{root_ou_id}"
                 )

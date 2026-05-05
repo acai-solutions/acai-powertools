@@ -6,7 +6,7 @@ variable "layer_settings" {
     compatible_runtimes      = list(string)
     compatible_architectures = list(string)
     acai_modules = optional(list(string), [
-      "aws_helper",
+      "boto3_helper",
       "logging",
       "python_helper",
       "storage"
@@ -20,11 +20,11 @@ variable "layer_settings" {
     condition = alltrue([
       for m in var.layer_settings.acai_modules : contains([
         "ai_embedding", "ai_hybrid_search", "ai_llm", "ai_text_search",
-        "ai_tools", "ai_vector_store", "aws_helper", "logging",
+        "ai_tools", "ai_vector_store", "boto3_helper", "logging",
         "python_helper", "storage", "webcrawler", "xml_parser"
       ], m)
     ])
-    error_message = "Each module must be one of: ai_embedding, ai_hybrid_search, ai_llm, ai_text_search, ai_tools, ai_vector_store, aws_helper, logging, python_helper, storage, webcrawler, xml_parser."
+    error_message = "Each module must be one of: ai_embedding, ai_hybrid_search, ai_llm, ai_text_search, ai_tools, ai_vector_store, boto3_helper, logging, python_helper, storage, webcrawler, xml_parser."
   }
 
   validation {
@@ -106,6 +106,12 @@ variable "ssm_parameter_prefix" {
   description = "Optional prefix for SSM parameter holding the module version."
   type        = string
   default     = ""
+}
+
+variable "create_product_version_ssm_parameter" {
+  description = "Whether to create the `/acai/powertools/productversion` SSM parameter. Set to false on all but one instance when this module is invoked multiple times in the same workspace to avoid concurrent PutParameter calls on the same global name (TooManyUpdates)."
+  type        = bool
+  default     = true
 }
 
 variable "resource_tags" {
