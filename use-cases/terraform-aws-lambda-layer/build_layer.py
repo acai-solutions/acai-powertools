@@ -22,6 +22,8 @@ Usage
 from __future__ import annotations
 
 import argparse
+import contextlib
+import hashlib
 import json
 import os
 import platform as _platform
@@ -29,8 +31,16 @@ import shutil
 import subprocess  # nosec B404
 import sys
 import tempfile
+import time
 import zipfile
 from pathlib import Path
+
+try:
+    import fcntl  # type: ignore[import-not-found]
+
+    _HAS_FCNTL = True
+except ImportError:  # pragma: no cover - Windows fallback
+    _HAS_FCNTL = False
 
 # ── Module dependency map (production-code imports only) ─────────────────────
 # logging <-> storage is a circular dep; both are always included together.
@@ -173,18 +183,116 @@ def build_layer_source(modules: list[str], output_dir: Path) -> None:
 
 
 def create_zip(source_dir: Path, zip_path: Path) -> None:
-    """Create a ZIP file from the layer source directory."""
+    """Create a ZIP file from the layer source directory.
+
+    Writes to a temp file in the same directory and atomically renames to the
+    final path. This guarantees that any concurrent reader sees either the old
+    complete zip or the new complete zip, never a partial one.
+    """
     zip_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for root, _dirs, files in os.walk(source_dir):
-            for fname in files:
-                file_path = Path(root) / fname
-                arcname = file_path.relative_to(source_dir)
-                zf.write(file_path, arcname)
+    tmp_fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{zip_path.name}.",
+        suffix=".tmp",
+        dir=str(zip_path.parent),
+    )
+    os.close(tmp_fd)
+    tmp_path = Path(tmp_name)
+
+    try:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for root, _dirs, files in os.walk(source_dir):
+                for fname in files:
+                    file_path = Path(root) / fname
+                    arcname = file_path.relative_to(source_dir)
+                    zf.write(file_path, arcname)
+        # os.replace is atomic on POSIX and Windows when src and dst are on
+        # the same filesystem (guaranteed here because tmp lives in dst dir).
+        os.replace(tmp_path, zip_path)
+    finally:
+        if tmp_path.exists():
+            with contextlib.suppress(OSError):
+                tmp_path.unlink()
 
     size_kb = zip_path.stat().st_size / 1024
     print(f"ZIP created: {zip_path} ({size_kb:.1f} KB)")
+
+
+@contextlib.contextmanager
+def _build_lock(lock_path: Path):
+    """Exclusive cross-process lock around the build of a single zip path.
+
+    Multiple Terraform `null_resource.build_layer` instances may target the
+    same `--output` (e.g. when a shared layer module is invoked once per
+    member account in the same root module). Without serialisation, parallel
+    builds rmtree/repopulate the same source dir and overwrite the same zip,
+    yielding a corrupt archive that Lambda rejects with "Could not unzip
+    uploaded file".
+
+    Implementation note: fcntl.flock is POSIX-only. On Windows we fall back
+    to a best-effort spin on an exclusive lock file; concurrent multi-process
+    builds on Windows are not a documented use case for this module.
+    """
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if _HAS_FCNTL:
+        with open(lock_path, "w", encoding="utf-8") as lock_fp:
+            fcntl.flock(lock_fp.fileno(), fcntl.LOCK_EX)  # type: ignore[name-defined]
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_fp.fileno(), fcntl.LOCK_UN)  # type: ignore[name-defined]
+        return
+
+    # Windows fallback: O_EXCL spin with timeout.
+    deadline = time.monotonic() + 600
+    while True:
+        try:
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_RDWR)
+            try:
+                yield
+            finally:
+                os.close(fd)
+                with contextlib.suppress(OSError):
+                    lock_path.unlink()
+            return
+        except FileExistsError:
+            if time.monotonic() > deadline:
+                print(
+                    f"ERROR: Timed out waiting for build lock: {lock_path}",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            time.sleep(0.25)
+
+
+def _inputs_fingerprint(
+    modules: list[str] | None,
+    requirements_specs: list[str],
+    inline_files: dict[str, str],
+    pip_platform: str | None,
+    pip_python_version: str | None,
+) -> str:
+    """Deterministic fingerprint of the build inputs.
+
+    Used to detect when an existing zip was produced from identical inputs and
+    can be reused instead of rebuilt — the typical case when a sibling
+    process has just finished building the same content.
+    """
+    payload = json.dumps(
+        {
+            "modules": sorted(modules) if modules else [],
+            "requirements": sorted(requirements_specs),
+            "inline_files": {
+                k: hashlib.sha256(v.encode("utf-8")).hexdigest()
+                for k, v in sorted(inline_files.items())
+            },
+            "pip_platform": pip_platform,
+            "pip_python_version": pip_python_version,
+        },
+        sort_keys=True,
+    ).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def install_pip_packages(
@@ -470,6 +578,96 @@ def _resolve_requirements_paths(source_dir: Path) -> list[Path]:
     return [req_file]
 
 
+def _do_build(args: argparse.Namespace) -> None:
+    """Run the actual build pipeline (sources + pip + inline files + zip)."""
+    if not args.no_acai:
+        modules = _select_modules(args)
+        if modules is None:
+            return
+        print(f"Building Lambda layer with {len(modules)} module(s):\n")
+        build_layer_source(modules, args.source_dir)
+    else:
+        print("Building Lambda layer (pip packages only):\n")
+        if args.source_dir.exists():
+            shutil.rmtree(args.source_dir)
+        (args.source_dir / "python").mkdir(parents=True, exist_ok=True)
+
+    if args.requirements:
+        install_pip_packages(
+            _resolve_requirements_paths(args.source_dir),
+            args.source_dir,
+            args.pip_platform,
+            args.pip_python_version,
+        )
+
+    _process_inline_files(args)
+
+    if not args.no_zip:
+        create_zip(args.source_dir, args.output)
+
+
+def _decode_env_json(env_var: str, expected_type: type) -> object | None:
+    """Best-effort JSON decode of an env var, returning None on absence/parse error/type mismatch."""
+    raw = os.environ.get(env_var, "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, expected_type) else None
+
+
+def _collect_fingerprint_inputs(
+    args: argparse.Namespace,
+) -> tuple[list[str] | None, list[str], dict[str, str]]:
+    """Resolve the inputs that feed into `_inputs_fingerprint`.
+
+    Returns (modules, requirements_specs, inline_files_map). Best-effort: a malformed
+    env var degrades to an empty value rather than aborting, since `_do_build` will
+    re-validate inputs strictly before actually building.
+    """
+    modules = None if args.no_acai else _select_modules(args)
+
+    requirements_specs: list[str] = []
+    if args.requirements:
+        parsed = _decode_env_json("PIP_REQUIREMENTS_JSON", list)
+        if parsed is not None:
+            requirements_specs = [s for s in parsed if isinstance(s, str)]
+
+    inline_files_map: dict[str, str] = {}
+    if args.inline_files:
+        parsed = _decode_env_json("INLINE_FILES_JSON", dict)
+        if parsed is not None:
+            inline_files_map = {k: v for k, v in parsed.items() if isinstance(v, str)}
+
+    return modules, requirements_specs, inline_files_map
+
+
+def _build_or_reuse(args: argparse.Namespace, fingerprint: str) -> None:
+    """Acquire the build lock, then either reuse the existing zip or rebuild."""
+    fingerprint_path = Path(str(args.output) + ".fingerprint")
+    lock_path = Path(str(args.output) + ".lock")
+
+    with _build_lock(lock_path):
+        existing_fp = (
+            fingerprint_path.read_text(encoding="utf-8").strip()
+            if fingerprint_path.exists()
+            else ""
+        )
+        if args.output.exists() and existing_fp == fingerprint and not args.no_zip:
+            print(
+                f"Reusing existing layer zip ({args.output.name}); inputs unchanged "
+                f"and another concurrent build already produced it."
+            )
+            return
+
+        _do_build(args)
+
+        if not args.no_zip:
+            fingerprint_path.write_text(fingerprint, encoding="utf-8")
+
+
 def main() -> None:
     parser = _create_parser()
     args = parser.parse_args()
@@ -481,31 +679,17 @@ def main() -> None:
     _validate_no_acai_args(args)
 
     try:
-        if not args.no_acai:
-            modules = _select_modules(args)
-            if modules is None:
-                return
-            print(f"Building Lambda layer with {len(modules)} module(s):\n")
-            build_layer_source(modules, args.source_dir)
-        else:
-            print("Building Lambda layer (pip packages only):\n")
-            if args.source_dir.exists():
-                shutil.rmtree(args.source_dir)
-            (args.source_dir / "python").mkdir(parents=True, exist_ok=True)
-
-        if args.requirements:
-            install_pip_packages(
-                _resolve_requirements_paths(args.source_dir),
-                args.source_dir,
-                args.pip_platform,
-                args.pip_python_version,
-            )
-
-        _process_inline_files(args)
-
-        if not args.no_zip:
-            create_zip(args.source_dir, args.output)
-
+        modules_for_fp, requirements_specs, inline_files_map = (
+            _collect_fingerprint_inputs(args)
+        )
+        fingerprint = _inputs_fingerprint(
+            modules_for_fp,
+            requirements_specs,
+            inline_files_map,
+            args.pip_platform,
+            args.pip_python_version,
+        )
+        _build_or_reuse(args, fingerprint)
         print("\nDone.")
     except Exception as e:
         print(f"ERROR: Build failed: {e}", file=sys.stderr)
