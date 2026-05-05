@@ -31,7 +31,7 @@ class BedrockTitanConfig(EmbedderConfig):
 class BedrockTitanEmbedder(EmbedderPort):
     """Adapter for generating text embeddings using Amazon Bedrock Titan."""
 
-    VERSION: str = "1.0.8"  # inject_version
+    VERSION: str = "1.0.9"  # inject_version
     MODEL_ID = "amazon.titan-embed-text-v1"
 
     def __init__(self, logger: Loggable, config: Optional[BedrockTitanConfig] = None):

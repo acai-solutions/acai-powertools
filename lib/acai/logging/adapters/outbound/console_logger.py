@@ -43,7 +43,7 @@ class ConsoleLogger(LoggerPort):
     CLI tools, and non-Lambda workloads.
     """
 
-    VERSION: str = "1.0.8"  # inject_version
+    VERSION: str = "1.0.9"  # inject_version
 
     def __init__(
         self,

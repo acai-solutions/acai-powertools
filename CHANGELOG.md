@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.9](https://github.com/acai-solutions/acai-powertools/compare/1.0.8...1.0.9) (2026-05-05)
+
+
+### Bug Fixes
+
+* build layer ([#9](https://github.com/acai-solutions/acai-powertools/issues/9)) ([422eb85](https://github.com/acai-solutions/acai-powertools/commit/422eb855f5fbb263e641895f74ca64c0ef0c3b53))
+
 ## [1.0.8](https://github.com/acai-solutions/acai-powertools/compare/1.0.7...1.0.8) (2026-05-05)
 
 
