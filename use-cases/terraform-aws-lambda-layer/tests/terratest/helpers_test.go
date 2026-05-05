@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gruntwork-io/terratest/modules/terraform"
 )
@@ -13,7 +14,7 @@ import (
 func uniqueStateKey(baseKey string) string {
 	runID := os.Getenv("GITHUB_RUN_ID")
 	if runID == "" {
-		return baseKey
+		runID = fmt.Sprintf("local-%d", time.Now().UnixNano())
 	}
 	attempt := os.Getenv("GITHUB_RUN_ATTEMPT")
 	if attempt == "" {
