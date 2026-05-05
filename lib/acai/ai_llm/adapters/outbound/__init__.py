@@ -1,5 +1,4 @@
-"""Outbound LLM adapters.
-"""
+"""Outbound LLM adapters."""
 
 from __future__ import annotations
 
@@ -19,7 +18,7 @@ __all__ = [
 ]
 
 
-def __getattr__(name: str):  
+def __getattr__(name: str):
 # acai_tags start: [anthropic]
     if name == "AnthropicClaudeAdapter":
         from acai.ai_llm.adapters.outbound.anthropic_claude_adapter import (
@@ -49,4 +48,3 @@ def __getattr__(name: str):
         return OpenAIAdapter
 # acai_tags end: [openai]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
