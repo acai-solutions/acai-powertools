@@ -10,6 +10,20 @@ import (
 	"github.com/gruntwork-io/terratest/modules/terraform"
 )
 
+func uniqueStateKey(baseKey string) string {
+	runID := os.Getenv("GITHUB_RUN_ID")
+	if runID == "" {
+		return baseKey
+	}
+	attempt := os.Getenv("GITHUB_RUN_ATTEMPT")
+	if attempt == "" {
+		attempt = "1"
+	}
+	const ext = ".tfstate"
+	base := strings.TrimSuffix(baseKey, ext)
+	return base + "-" + runID + "-" + attempt + ext
+}
+
 func loadBackendConfig(t *testing.T, stateKey string) map[string]interface{} {
 	backendConfig := map[string]interface{}{}
 	data, err := os.ReadFile("backend.json")

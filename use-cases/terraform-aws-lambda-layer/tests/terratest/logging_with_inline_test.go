@@ -19,7 +19,7 @@ func TestAcaiPowertoolsLambdaLayerWithInline(t *testing.T) {
 	t.Log("Starting ACAI Powertools Lambda Layer with inline files test")
 
 	terraformDir := "../../examples/logging_with_inline"
-	stateKey := "terratest/terraform-aws-acai-powertools-layer-with-inline.tfstate"
+	stateKey := uniqueStateKey("terratest/terraform-aws-acai-powertools-layer-with-inline.tfstate")
 	backendConfig := loadBackendConfig(t, stateKey)
 
 	terraformOptions := &terraform.Options{

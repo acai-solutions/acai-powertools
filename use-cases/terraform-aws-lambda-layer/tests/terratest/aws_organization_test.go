@@ -19,7 +19,7 @@ func TestAcaiPowertoolsOrganizationsHelper(t *testing.T) {
 	t.Log("Starting ACAI Powertools Organizations Helper test")
 
 	terraformDir := "../../examples/aws_organization"
-	stateKey := "terratest/terraform-aws-acai-powertools-organizations.tfstate"
+	stateKey := uniqueStateKey("terratest/terraform-aws-acai-powertools-organizations.tfstate")
 	backendConfig := loadBackendConfig(t, stateKey)
 
 	terraformOptions := &terraform.Options{

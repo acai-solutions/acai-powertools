@@ -20,7 +20,7 @@ func TestAcaiPowertoolsLambdaLayerWithPip(t *testing.T) {
 	t.Log("Starting ACAI Powertools Lambda Layer with pip packages test")
 
 	terraformDir := "../../examples/logging_with_pip"
-	stateKey := "terratest/terraform-aws-acai-powertools-layer-with-pip.tfstate"
+	stateKey := uniqueStateKey("terratest/terraform-aws-acai-powertools-layer-with-pip.tfstate")
 	backendConfig := loadBackendConfig(t, stateKey)
 
 	terraformOptions := &terraform.Options{
