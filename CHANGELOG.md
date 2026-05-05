@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.8](https://github.com/acai-solutions/acai-powertools/compare/1.0.7...1.0.8) (2026-05-05)
+
+
+### Bug Fixes
+
+* refine sts ([#8](https://github.com/acai-solutions/acai-powertools/issues/8)) ([093fb74](https://github.com/acai-solutions/acai-powertools/commit/093fb749449951166e57f0ffc7341e841101766a))
+
 ## [1.0.7](https://github.com/acai-solutions/acai-powertools/compare/1.0.6...1.0.7) (2026-05-04)
 
 

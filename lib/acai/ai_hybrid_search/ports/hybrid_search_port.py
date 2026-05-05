@@ -16,7 +16,7 @@ class HybridSearchPort(ABC):
     implement it.
     """
 
-    VERSION: str = "1.0.7"  # inject_version
+    VERSION: str = "1.0.8"  # inject_version
 
     @abstractmethod
     def search(

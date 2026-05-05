@@ -24,7 +24,7 @@ class AwsLambdaPtLogger(LoggerPort):
     and CloudWatch Logs Insights integration is desired.
     """
 
-    VERSION: str = "1.0.7"  # inject_version
+    VERSION: str = "1.0.8"  # inject_version
 
     def __init__(
         self,

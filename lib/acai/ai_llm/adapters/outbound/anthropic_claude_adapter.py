@@ -52,7 +52,7 @@ class AnthropicClaudeAdapter(LlmPort):
         pip install anthropic
     """
 
-    VERSION: str = "1.0.7"  # inject_version
+    VERSION: str = "1.0.8"  # inject_version
 
     def __init__(
         self,
