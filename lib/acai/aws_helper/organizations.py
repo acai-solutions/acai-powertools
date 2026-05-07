@@ -3,10 +3,21 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import boto3
+from botocore.config import Config as BotoConfig
 from acai.aws_helper.ou_path_resolver import OuPathResolver
 
 if TYPE_CHECKING:
     from acai.logging import Loggable
+
+
+# AWS Organizations has very strict per-org TPS quotas (single-digit TPS for
+# most read APIs). The default boto3 retry config (`standard`, 3 retries)
+# trips `TooManyRequestsException` on bulk reads such as cache refreshes.
+# `adaptive` mode adds a client-side token bucket that proactively throttles
+# in response to observed throttling, on top of exponential-backoff retries.
+_DEFAULT_ORG_CLIENT_CONFIG = BotoConfig(
+    retries={"max_attempts": 10, "mode": "adaptive"},
+)
 
 
 class OrganizationsHelper(OuPathResolver):
@@ -25,7 +36,11 @@ class OrganizationsHelper(OuPathResolver):
             logger: Logger instance for debug/info/warning messages
             org_client: Optional boto3 Organizations client. If not provided, creates one.
         """
-        super().__init__(logger, org_client or boto3.client("organizations"))
+        super().__init__(
+            logger,
+            org_client
+            or boto3.client("organizations", config=_DEFAULT_ORG_CLIENT_CONFIG),
+        )
         self._parents_cache: dict[str, tuple[str, str]] = {}
         self.ou_id_with_path_cache: dict[str, tuple[str, str]] = {}
         self.ou_name_cache: dict[str, str] = {}
