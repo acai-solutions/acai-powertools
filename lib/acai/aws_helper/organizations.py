@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 import boto3
-from botocore.config import Config as BotoConfig
 from acai.aws_helper.ou_path_resolver import OuPathResolver
+from botocore.config import Config as BotoConfig
 
 if TYPE_CHECKING:
     from acai.logging import Loggable
