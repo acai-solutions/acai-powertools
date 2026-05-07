@@ -108,6 +108,12 @@ variable "ssm_parameter_prefix" {
   default     = ""
 }
 
+variable "create_product_version_ssm_parameter" {
+  description = "Whether to create the `/acai/powertools/productversion` SSM parameter. Set to false on all but one instance when this module is invoked multiple times in the same workspace to avoid concurrent PutParameter calls on the same global name (TooManyUpdates)."
+  type        = bool
+  default     = true
+}
+
 variable "resource_tags" {
   description = "A map of tags to assign to the resources in this module."
   type        = map(string)
