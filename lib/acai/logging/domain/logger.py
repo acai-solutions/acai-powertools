@@ -80,6 +80,7 @@ class Logger:
         self.log(LogLevel.CRITICAL, message, **kwargs)
 
     def exception(self, message: str, **kwargs: Any) -> None:
+        kwargs.pop("exc_info", None)
         self.log(LogLevel.ERROR, message, exc_info=True, **kwargs)
 
     def flush(self) -> None:
