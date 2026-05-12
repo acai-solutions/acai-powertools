@@ -35,7 +35,7 @@ class DoclingParser(PdfParserPort):
     Driven adapter implementing ``PdfParserPort``.
     """
 
-    VERSION: str = "1.0.9"  # inject_version
+    VERSION: str = "1.0.10"  # inject_version
 
     def __init__(
         self,

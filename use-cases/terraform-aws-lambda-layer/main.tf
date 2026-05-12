@@ -29,7 +29,7 @@ locals {
     }
   )
   aws_ssm_parameter_prefix = var.ssm_parameter_prefix == "" ? "" : "/${lower(var.ssm_parameter_prefix)}"
-  solution_version         = /*inject_version_start*/ "1.0.9" /*inject_version_end*/
+  solution_version         = /*inject_version_start*/ "1.0.10" /*inject_version_end*/
 }
 resource "aws_ssm_parameter" "product_version" {
   # The parameter name is global per ssm_parameter_prefix. When this module
