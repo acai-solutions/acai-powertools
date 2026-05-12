@@ -47,8 +47,8 @@ class MistralConfig(LlmConfig):
     stop_sequences: List[str] = field(default_factory=list)
     max_retries: int = 5
     retry_base_delay: float = 5.0
-    price_per_input_token: float = 0.50 / 1_000_000   # $0.50 / 1M
-    price_per_output_token: float = 1.50 / 1_000_000   # $1.50 / 1M
+    price_per_input_token: float = 0.50 / 1_000_000  # $0.50 / 1M
+    price_per_output_token: float = 1.50 / 1_000_000  # $1.50 / 1M
 
 
 class MistralAdapter(LlmPort):
@@ -94,10 +94,7 @@ class MistralAdapter(LlmPort):
         try:
             import openai
 
-            api_key = (
-                self.config.api_key
-                or os.environ.get("MISTRAL_API_KEY", "")
-            )
+            api_key = self.config.api_key or os.environ.get("MISTRAL_API_KEY", "")
             if not api_key:
                 raise ModelInvocationError(
                     "No Mistral API key provided. Set api_key in MistralConfig "
