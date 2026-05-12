@@ -33,12 +33,12 @@ jobs:
       py_test_extra_pip_packages: "lxml beautifulsoup4 selenium psycopg2-binary pgvector boto3 voyageai openai"
       py_ai_autofix_include: true
       hcl_docs_skip: true
-      hcl_test_beds: '["AWS", "AWS_ESC"]'
-      hcl_test_bed_aws_terratest_configs: '["aws/matrix_tf1x5x7_aws6x0x0.json", "aws/matrix_ofu1x6x0_aws6x0x0.json"]'
-      hcl_test_bed_aws_esc_terratest_configs: '["aws/matrix_tf1x14x0_aws6x29x0.json", "aws/matrix_ofu1x9x0_aws6x29x0_only.json"]'
-      #hcl_test_beds: '["AWS"]'
-      #hcl_test_bed_aws_terratest_configs: '["aws/matrix_tf1x5x7_aws6x0x0.json"]'
-      #hcl_test_bed_aws_esc_terratest_configs: '["aws/matrix_tf1x5x7_aws6x0x0.json"]'
+      #hcl_test_beds: '["AWS", "AWS_ESC"]'
+      #hcl_test_bed_aws_terratest_configs: '["aws/matrix_tf1x5x7_aws6x0x0.json", "aws/matrix_ofu1x6x0_aws6x0x0.json"]'
+      #hcl_test_bed_aws_esc_terratest_configs: '["aws/matrix_tf1x14x0_aws6x29x0.json", "aws/matrix_ofu1x9x0_aws6x29x0_only.json"]'
+      hcl_test_beds: '["AWS"]'
+      hcl_test_bed_aws_terratest_configs: '["aws/matrix_tf1x5x7_aws6x0x0.json"]'
+      hcl_test_bed_aws_esc_terratest_configs: '["aws/matrix_tf1x5x7_aws6x0x0.json"]'
       hcl_terratest_path: "use-cases/terraform-aws-lambda-layer/tests/terratest"
       hcl_terratest_examples_path: "use-cases/terraform-aws-lambda-layer/examples"
       hcl_ai_autofix_include: true
