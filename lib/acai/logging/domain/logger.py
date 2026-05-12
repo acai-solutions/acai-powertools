@@ -35,9 +35,7 @@ class Logger:
         # stack.  The value is an immutable tuple — every push/pop replaces
         # the var so the change is scoped to the current Context only.
         self._stack_var: contextvars.ContextVar[Tuple[Dict[str, Any], ...]] = (
-            contextvars.ContextVar(
-                f"acai_logger_context_stack_{id(self)}", default=()
-            )
+            contextvars.ContextVar(f"acai_logger_context_stack_{id(self)}", default=())
         )
 
     # ── context stack ─────────────────────────────────────────────────
