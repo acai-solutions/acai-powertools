@@ -16,6 +16,7 @@ Adapters (import directly when needed)
 - ``acai.ai_llm.adapters.AnthropicClaudeAdapter``
 - ``acai.ai_llm.adapters.BedrockClaudeAdapter``
 - ``acai.ai_llm.adapters.LocalLlmAdapter``
+- ``acai.ai_llm.adapters.MistralAdapter``
 - ``acai.ai_llm.adapters.OpenAIAdapter``
 
 Backward compatibility
@@ -136,6 +137,23 @@ def create_llm(
             cfg.model_name = model_name
         return OpenAIAdapter(logger=logger, config=cfg)
 
+    if provider == "mistral":
+        from acai.ai_llm.adapters.outbound.mistral_adapter import (
+            MistralAdapter,
+            MistralConfig,
+        )
+
+        cfg = MistralConfig(
+            api_key=api_key,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            price_per_input_token=price_per_input_token,
+            price_per_output_token=price_per_output_token,
+        )
+        if model_name:
+            cfg.model_name = model_name
+        return MistralAdapter(logger=logger, config=cfg)
+
     if provider == "local":
         from acai.ai_llm.adapters.outbound.local_llm_adapter import (
             LocalLlmAdapter,
@@ -153,7 +171,7 @@ def create_llm(
         return LocalLlmAdapter(logger=logger, config=cfg)
 
     raise ConfigurationError(
-        f"Unknown provider '{provider}'. Choose from: anthropic, bedrock_claude, local, openai"
+        f"Unknown provider '{provider}'. Choose from: anthropic, bedrock_claude, local, mistral, openai"
     )
 
 
