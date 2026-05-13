@@ -30,7 +30,7 @@ class GrafanaCloudLogger(LoggerPort):
     * **LOG_LEVEL** - Initial log level (DEBUG, INFO, …)
     """
 
-    VERSION: str = "1.0.9"  # inject_version
+    VERSION: str = "1.0.10"  # inject_version
 
     # OTLP severity numbers aligned with OpenTelemetry spec
     _SEVERITY_MAP: Dict[int, tuple[int, str]] = {
@@ -142,9 +142,12 @@ class GrafanaCloudLogger(LoggerPort):
         for key, value in kwargs.items():
             attributes.append({"key": key, "value": {"stringValue": str(value)}})
 
-        body = message
+        # Build body as JSON so Loki's ``| json`` stage can parse it.
+        body_dict: Dict[str, Any] = {"message": message}
+        body_dict.update(kwargs)
         if exc_info:
-            body = f"{message}\n{traceback.format_exc()}"
+            body_dict["traceback"] = traceback.format_exc()
+        body = json.dumps(body_dict, ensure_ascii=False, default=str)
 
         return {
             "timeUnixNano": time_unix_nano,

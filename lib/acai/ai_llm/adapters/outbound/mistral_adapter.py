@@ -1,17 +1,24 @@
-"""OpenAI adapter — calls OpenAI chat-completion models.
+"""Mistral adapter — calls Mistral models via La Plateforme (api.mistral.ai).
 
 Hexagonal role
 --------------
-Outbound adapter implementing ``LlmPort``.  Uses the official ``openai``
-Python SDK.  Supports text, image, and document (PDF) content blocks.
+Outbound adapter implementing ``LlmPort``.  Uses the ``openai`` Python SDK
+pointed at Mistral's OpenAI-compatible endpoint.
 
-When ``api_key`` is empty the SDK auto-reads ``OPENAI_API_KEY`` from the
-environment.
+Key properties of La Plateforme:
+- EU-hosted, GDPR-compliant — data stays in the EU.
+- All Mistral models available (Large 3, Large 3 2512, etc.).
+- 262k context window on Large 3.
+- OpenAI SDK compatible: ``base_url="https://api.mistral.ai/v1"``.
+
+When ``api_key`` is empty the SDK falls back to the ``MISTRAL_API_KEY``
+environment variable.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import time
 from dataclasses import dataclass, field
 from typing import Any, List
@@ -24,31 +31,47 @@ from acai.logging import Loggable
 
 
 @dataclass
-class OpenAIConfig(LlmConfig):
-    """Configuration specific to the OpenAI adapter.
+class MistralConfig(LlmConfig):
+    """Configuration specific to the Mistral adapter.
 
-    When ``api_key`` is empty the SDK falls back to the
-    ``OPENAI_API_KEY`` environment variable.
+    When ``api_key`` is empty the adapter reads ``MISTRAL_API_KEY`` from
+    the environment — matching the Mistral SDK convention.
     """
 
+    base_url: str = "https://api.mistral.ai/v1"
     api_key: str = ""
-    model_name: str = "gpt-4o"
-    max_text_length: int = 200_000
+    model_name: str = "mistral-large-latest"
+    max_text_length: int = 262_000
     max_tokens: int = 4096
     temperature: float = 0.7
     stop_sequences: List[str] = field(default_factory=list)
     max_retries: int = 5
     retry_base_delay: float = 5.0
-    price_per_input_token: float = 0.0
-    price_per_output_token: float = 0.0
+    price_per_input_token: float = 0.50 / 1_000_000  # $0.50 / 1M
+    price_per_output_token: float = 1.50 / 1_000_000  # $1.50 / 1M
 
 
-class OpenAIAdapter(LlmPort):
-    """LLM adapter that calls the OpenAI Chat Completions API.
+class MistralAdapter(LlmPort):
+    """LLM adapter that calls Mistral models via La Plateforme.
 
-    Requires the ``openai`` package::
+    Requires the ``openai`` package (Mistral's API is OpenAI-compatible)::
 
         pip install openai
+
+    Example::
+
+        from acai.ai_llm.adapters.outbound.mistral_adapter import (
+            MistralAdapter, MistralConfig,
+        )
+
+        adapter = MistralAdapter(
+            config=MistralConfig(
+                api_key="your-mistral-key",
+                model_name="mistral-large-latest",
+            )
+        )
+        result = adapter.get_response("Was ist ein Mietvertrag?")
+        print(result["response"])
     """
 
     VERSION: str = "1.0.10"  # inject_version
@@ -56,29 +79,38 @@ class OpenAIAdapter(LlmPort):
     def __init__(
         self,
         logger: Loggable | None = None,
-        config: OpenAIConfig | None = None,
+        config: MistralConfig | None = None,
     ) -> None:
-        self.config = config or OpenAIConfig()
-        self.logger = logger or logging.getLogger("openai")
+        self.config = config or MistralConfig()
+        self.logger = logger or logging.getLogger("mistral")
         self._initialize_client()
         self.logger.info(
-            "Initialized OpenAIAdapter",
+            "Initialized MistralAdapter",
             model=self.config.model_name,
+            base_url=self.config.base_url,
         )
 
     def _initialize_client(self) -> None:
         try:
             import openai
 
-            kwargs: dict[str, Any] = {}
-            if self.config.api_key:
-                kwargs["api_key"] = self.config.api_key
+            api_key = self.config.api_key or os.environ.get("MISTRAL_API_KEY", "")
+            if not api_key:
+                raise ModelInvocationError(
+                    "No Mistral API key provided. Set api_key in MistralConfig "
+                    "or the MISTRAL_API_KEY environment variable."
+                )
 
-            self.client = openai.OpenAI(**kwargs)
+            self.client = openai.OpenAI(
+                api_key=api_key,
+                base_url=self.config.base_url,
+            )
+        except ModelInvocationError:
+            raise
         except Exception as exc:
-            self.logger.error("Failed to initialize OpenAI client", error=str(exc))
+            self.logger.error("Failed to initialize Mistral client", error=str(exc))
             raise ModelInvocationError(
-                f"OpenAI client initialization failed: {exc}"
+                f"Mistral client initialization failed: {exc}"
             ) from exc
 
     def _validate_input(self, text: str) -> None:
@@ -94,7 +126,7 @@ class OpenAIAdapter(LlmPort):
     def _build_content_blocks(
         prompt: str, content_blocks: list[ContentBlock] | None
     ) -> str | list[dict[str, Any]]:
-        """Return plain string or OpenAI multi-block content list."""
+        """Return plain string or OpenAI-style multi-block content list."""
         if not content_blocks:
             return prompt
 
@@ -111,20 +143,18 @@ class OpenAIAdapter(LlmPort):
                     }
                 )
             elif block.content_type == ContentType.DOCUMENT:
-                data_uri = f"data:{block.media_type};base64,{block.data}"
-                item: dict[str, Any] = {
-                    "type": "file",
-                    "file": {"file_data": data_uri},
-                }
-                if block.filename:
-                    item["file"]["filename"] = block.filename
-                parts.append(item)
-        # append the text prompt at the end
+                # Mistral doesn't natively support document blocks — pass as text.
+                parts.append(
+                    {
+                        "type": "text",
+                        "text": f"[Document: {block.filename or block.media_type}]\n{block.data}",
+                    }
+                )
         parts.append({"type": "text", "text": prompt})
         return parts
 
     def _call_api_with_retries(self, kwargs: dict[str, Any]) -> dict[str, Any]:
-        """Call OpenAI API with retry logic for rate-limit (429) errors."""
+        """Call Mistral API with retry logic for rate-limit (429) errors."""
         import openai as _openai
 
         last_exc: Exception | None = None
@@ -154,20 +184,20 @@ class OpenAIAdapter(LlmPort):
                 if attempt < self.config.max_retries:
                     delay = self.config.retry_base_delay * (2**attempt)
                     self.logger.warning(
-                        "OpenAI rate limited, retrying",
+                        "Mistral rate limited, retrying",
                         attempt=attempt + 1,
                         delay=delay,
                     )
                     time.sleep(delay)
                 else:
-                    self.logger.error("OpenAI rate limited after all retries")
+                    self.logger.error("Mistral rate limited after all retries")
 
-        raise ModelInvocationError(f"OpenAI API error: {last_exc}") from last_exc
+        raise ModelInvocationError(f"Mistral API error: {last_exc}") from last_exc
 
     def _call_structured_api_with_retries(
         self, kwargs: dict[str, Any]
     ) -> dict[str, Any]:
-        """Call OpenAI API for structured response with retry logic."""
+        """Call Mistral API for structured (tool-use) responses with retries."""
         import json as _json
 
         import openai as _openai
@@ -181,7 +211,7 @@ class OpenAIAdapter(LlmPort):
 
                 if not choice.message.tool_calls:
                     raise ModelInvocationError(
-                        "OpenAI response did not contain tool_calls"
+                        "Mistral response did not contain tool_calls"
                     )
 
                 tool_call = choice.message.tool_calls[0]
@@ -209,15 +239,15 @@ class OpenAIAdapter(LlmPort):
                 if attempt < self.config.max_retries:
                     delay = self.config.retry_base_delay * (2**attempt)
                     self.logger.warning(
-                        "OpenAI rate limited, retrying",
+                        "Mistral rate limited, retrying",
                         attempt=attempt + 1,
                         delay=delay,
                     )
                     time.sleep(delay)
                 else:
-                    self.logger.error("OpenAI rate limited after all retries")
+                    self.logger.error("Mistral rate limited after all retries")
 
-        raise ModelInvocationError(f"OpenAI API error: {last_exc}") from last_exc
+        raise ModelInvocationError(f"Mistral API error: {last_exc}") from last_exc
 
     def get_response(
         self,
@@ -228,27 +258,6 @@ class OpenAIAdapter(LlmPort):
         stop_sequences: list[str] | None = None,
         content_blocks: list[ContentBlock] | None = None,
     ) -> dict[str, Any]:
-        """Call the OpenAI Chat Completions API and return the response.
-
-        Parameters
-        ----------
-        prompt:
-            User message content.
-        system_prompt:
-            Optional system instruction prepended to the conversation.
-        temperature:
-            Sampling temperature (overrides config default).
-        max_tokens:
-            Maximum response tokens (overrides config default).
-        stop_sequences:
-            Optional stop sequences (overrides config default).
-        content_blocks:
-            Optional multi-modal content blocks (images, PDFs, …).
-
-        Returns
-        -------
-        dict with keys ``response``, ``usage``, ``model``.
-        """
         try:
             self._validate_input(prompt)
             self.logger.debug(
@@ -266,7 +275,7 @@ class OpenAIAdapter(LlmPort):
 
             kwargs: dict[str, Any] = {
                 "model": self.config.model_name,
-                "max_completion_tokens": max_tokens or self.config.max_tokens,
+                "max_tokens": max_tokens or self.config.max_tokens,
                 "temperature": (
                     temperature if temperature is not None else self.config.temperature
                 ),
@@ -288,8 +297,8 @@ class OpenAIAdapter(LlmPort):
         except ModelInvocationError:
             raise
         except Exception as exc:
-            self.logger.error("OpenAI API error", error=str(exc))
-            raise ModelInvocationError(f"OpenAI API error: {exc}") from exc
+            self.logger.error("Mistral API error", error=str(exc))
+            raise ModelInvocationError(f"Mistral API error: {exc}") from exc
 
     def get_structured_response(
         self,
@@ -301,11 +310,7 @@ class OpenAIAdapter(LlmPort):
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> dict[str, Any]:
-        """Call OpenAI Chat Completions with function calling (strict mode).
-
-        The schema is passed as ``parameters`` of a function tool with
-        ``strict: true``, guaranteeing the response matches the schema exactly.
-        """
+        """Call Mistral with function calling for structured output."""
         try:
             self._validate_input(prompt)
             self.logger.debug(
@@ -322,7 +327,7 @@ class OpenAIAdapter(LlmPort):
 
             kwargs: dict[str, Any] = {
                 "model": self.config.model_name,
-                "max_completion_tokens": max_tokens or self.config.max_tokens,
+                "max_tokens": max_tokens or self.config.max_tokens,
                 "temperature": (
                     temperature if temperature is not None else self.config.temperature
                 ),
@@ -335,14 +340,10 @@ class OpenAIAdapter(LlmPort):
                             "description": tool_description
                             or f"Structured extraction via {tool_name}",
                             "parameters": schema,
-                            "strict": True,
                         },
                     }
                 ],
-                "tool_choice": {
-                    "type": "function",
-                    "function": {"name": tool_name},
-                },
+                "tool_choice": "any",
             }
 
             return self._call_structured_api_with_retries(kwargs)
@@ -352,5 +353,5 @@ class OpenAIAdapter(LlmPort):
         except ModelInvocationError:
             raise
         except Exception as exc:
-            self.logger.error("OpenAI structured API error", error=str(exc))
-            raise ModelInvocationError(f"OpenAI API error: {exc}") from exc
+            self.logger.error("Mistral structured API error", error=str(exc))
+            raise ModelInvocationError(f"Mistral API error: {exc}") from exc

@@ -52,7 +52,7 @@ class AnthropicClaudeAdapter(LlmPort):
         pip install anthropic
     """
 
-    VERSION: str = "1.0.9"  # inject_version
+    VERSION: str = "1.0.10"  # inject_version
 
     def __init__(
         self,
@@ -95,6 +95,13 @@ class AnthropicClaudeAdapter(LlmPort):
                 f"Input text length ({len(text)}) exceeds maximum "
                 f"({self.config.max_text_length})"
             )
+
+    # Models that use adaptive thinking instead of temperature sampling.
+    _ADAPTIVE_THINKING_PREFIXES = ("claude-opus-4-7",)
+
+    def _model_uses_adaptive_thinking(self) -> bool:
+        """Return True if the configured model uses adaptive thinking (no temperature)."""
+        return self.config.model_name.startswith(self._ADAPTIVE_THINKING_PREFIXES)
 
     @staticmethod
     def _build_content_blocks(
@@ -269,9 +276,6 @@ class AnthropicClaudeAdapter(LlmPort):
             kwargs: dict[str, Any] = {
                 "model": self.config.model_name,
                 "max_tokens": max_tokens or self.config.max_tokens,
-                "temperature": (
-                    temperature if temperature is not None else self.config.temperature
-                ),
                 "messages": [
                     {
                         "role": "user",
@@ -279,6 +283,10 @@ class AnthropicClaudeAdapter(LlmPort):
                     }
                 ],
             }
+            if not self._model_uses_adaptive_thinking():
+                kwargs["temperature"] = (
+                    temperature if temperature is not None else self.config.temperature
+                )
             if system_prompt:
                 kwargs["system"] = system_prompt
 
@@ -328,9 +336,6 @@ class AnthropicClaudeAdapter(LlmPort):
             kwargs: dict[str, Any] = {
                 "model": self.config.model_name,
                 "max_tokens": max_tokens or self.config.max_tokens,
-                "temperature": (
-                    temperature if temperature is not None else self.config.temperature
-                ),
                 "messages": [{"role": "user", "content": prompt}],
                 "tools": [
                     {
@@ -342,6 +347,10 @@ class AnthropicClaudeAdapter(LlmPort):
                 ],
                 "tool_choice": {"type": "tool", "name": tool_name},
             }
+            if not self._model_uses_adaptive_thinking():
+                kwargs["temperature"] = (
+                    temperature if temperature is not None else self.config.temperature
+                )
             if system_prompt:
                 kwargs["system"] = system_prompt
 

@@ -6,6 +6,7 @@ __all__ = [
     "AnthropicClaudeAdapter",
     "BedrockClaudeAdapter",
     "LocalLlmAdapter",
+    "MistralAdapter",
     "OpenAIAdapter",
 ]
 
@@ -27,6 +28,10 @@ def __getattr__(name: str):
         from acai.ai_llm.adapters.outbound.local_llm_adapter import LocalLlmAdapter
 
         return LocalLlmAdapter
+    if name == "MistralAdapter":
+        from acai.ai_llm.adapters.outbound.mistral_adapter import MistralAdapter
+
+        return MistralAdapter
     if name == "OpenAIAdapter":
         from acai.ai_llm.adapters.outbound.openai_adapter import OpenAIAdapter
 

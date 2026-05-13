@@ -1,8 +1,9 @@
+import contextvars
 import json
 import logging
 import traceback
 from functools import wraps
-from typing import Any, Callable, Dict, Optional, Union
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 from acai.logging.log_level import LogLevel
 from acai.logging.ports import LoggerPort
@@ -17,29 +18,47 @@ class Logger:
     hexagon and delegates actual I/O to the injected ``LoggerPort`` adapter.
     It satisfies the ``Loggable`` protocol so it can be passed anywhere a
     logger-like object is expected.
+
+    Concurrency
+    ───────────
+    The context stack is stored in a :class:`contextvars.ContextVar` so that
+    concurrent requests, asyncio tasks, and threadpool workers each see an
+    isolated stack.  This is essential for web frameworks (FastAPI, Starlette,
+    etc.) where a single ``Logger`` singleton is shared across requests:
+    without ``ContextVar`` isolation, a ``push_context`` from request A would
+    leak into log lines emitted by request B.
     """
 
     def __init__(self, logger: LoggerPort):
         self._logger = logger
-        self._context_stack: list[dict[str, Any]] = []
+        # Per-instance ContextVar so multiple Logger instances do not share a
+        # stack.  The value is an immutable tuple — every push/pop replaces
+        # the var so the change is scoped to the current Context only.
+        self._stack_var: contextvars.ContextVar[Tuple[Dict[str, Any], ...]] = (
+            contextvars.ContextVar(f"acai_logger_context_stack_{id(self)}", default=())
+        )
 
     # ── context stack ─────────────────────────────────────────────────
 
     def push_context(self, context: dict[str, Any]) -> None:
         if context:
-            self._context_stack.append(context.copy())
+            self._stack_var.set(self._stack_var.get() + (dict(context),))
 
     def pop_context(self) -> dict[str, Any] | None:
-        return self._context_stack.pop() if self._context_stack else None
+        stack = self._stack_var.get()
+        if not stack:
+            return None
+        self._stack_var.set(stack[:-1])
+        return dict(stack[-1])
 
     def get_current_context(self) -> dict[str, Any]:
         merged: dict[str, Any] = {}
-        for ctx in self._context_stack:
+        for ctx in self._stack_var.get():
             merged.update(ctx)
         return merged
 
     def clear_context(self) -> None:
-        self._context_stack.clear()
+        self._stack_var.set(())
 
     # aliases used by aws-lambda-powertools convention
     append_keys = push_context

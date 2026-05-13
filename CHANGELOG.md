@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.10](https://github.com/acai-solutions/acai-powertools/compare/1.0.9...1.0.10) (2026-05-12)
+
+
+### Bug Fixes
+
+* Grafana Logger, add Mistral ([#11](https://github.com/acai-solutions/acai-powertools/issues/11)) ([cf71c9a](https://github.com/acai-solutions/acai-powertools/commit/cf71c9a8f39621405264ae13dad73eeb07139076)), closes [#12](https://github.com/acai-solutions/acai-powertools/issues/12)
+
 ## [1.0.9](https://github.com/acai-solutions/acai-powertools/compare/1.0.8...1.0.9) (2026-05-05)
 
 
