@@ -102,16 +102,16 @@ variable "regions" {
 # ---------------------------------------------------------------------------------------------------------------------
 # ¦ COMMON
 # ---------------------------------------------------------------------------------------------------------------------
+variable "create_product_version_ssm_parameter" {
+  description = "Whether to create the SSM parameter for the product version. Set to false when multiple instances of this module share the same ssm_parameter_prefix to avoid TooManyUpdates errors."
+  type        = bool
+  default     = true
+}
+
 variable "ssm_parameter_prefix" {
   description = "Optional prefix for SSM parameter holding the module version."
   type        = string
   default     = ""
-}
-
-variable "create_product_version_ssm_parameter" {
-  description = "Whether to create the `/acai/powertools/productversion` SSM parameter. Set to false on all but one instance when this module is invoked multiple times in the same workspace to avoid concurrent PutParameter calls on the same global name (TooManyUpdates)."
-  type        = bool
-  default     = true
 }
 
 variable "resource_tags" {
