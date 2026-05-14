@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.11](https://github.com/acai-solutions/acai-powertools/compare/1.0.10...1.0.11) (2026-05-14)
+
+
+### Bug Fixes
+
+* layer trigger ([#18](https://github.com/acai-solutions/acai-powertools/issues/18)) ([216882f](https://github.com/acai-solutions/acai-powertools/commit/216882f6326e960e8a83d5c55e7fb8e8a2d96af1))
+
 ## [1.0.10](https://github.com/acai-solutions/acai-powertools/compare/1.0.9...1.0.10) (2026-05-12)
 
 

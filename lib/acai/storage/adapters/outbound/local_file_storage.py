@@ -22,7 +22,7 @@ class LocalFileStorage(StoragePort):
     optional backups, extension validation, and JSON (de)serialisation.
     """
 
-    VERSION: str = "1.0.10"  # inject_version
+    VERSION: str = "1.0.11"  # inject_version
 
     def __init__(
         self,

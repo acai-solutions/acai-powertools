@@ -24,7 +24,7 @@ class S3Storage(StoragePort):
     *client* (not resource) so it stays lightweight and testable.
     """
 
-    VERSION: str = "1.0.10"  # inject_version
+    VERSION: str = "1.0.11"  # inject_version
 
     def __init__(
         self,

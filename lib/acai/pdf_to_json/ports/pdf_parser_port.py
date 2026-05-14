@@ -15,7 +15,7 @@ class PdfParserPort(ABC):
     - ``parse_bytes`` — parse an in-memory byte stream directly
     """
 
-    VERSION: str = "1.0.10"  # inject_version
+    VERSION: str = "1.0.11"  # inject_version
 
     @abstractmethod
     def parse_file(self, pdf_path: Union[str, Path]) -> ParsedPdfDocument:

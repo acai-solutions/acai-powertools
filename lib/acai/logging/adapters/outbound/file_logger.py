@@ -21,7 +21,7 @@ class FileLogger(LoggerPort):
     content is preserved across calls within the same adapter instance.
     """
 
-    VERSION: str = "1.0.10"  # inject_version
+    VERSION: str = "1.0.11"  # inject_version
 
     def __init__(
         self,

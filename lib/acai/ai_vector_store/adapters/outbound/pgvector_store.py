@@ -71,7 +71,7 @@ _INDEX_OPS = {
 class PgvectorStore(VectorStorePort):
     """Driven adapter implementing ``VectorStorePort`` for PostgreSQL + pgvector."""
 
-    VERSION: str = "1.0.10"  # inject_version
+    VERSION: str = "1.0.11"  # inject_version
 
     def __init__(
         self,

@@ -30,7 +30,7 @@ class GrafanaCloudLogger(LoggerPort):
     * **LOG_LEVEL** - Initial log level (DEBUG, INFO, …)
     """
 
-    VERSION: str = "1.0.10"  # inject_version
+    VERSION: str = "1.0.11"  # inject_version
 
     # OTLP severity numbers aligned with OpenTelemetry spec
     _SEVERITY_MAP: Dict[int, tuple[int, str]] = {

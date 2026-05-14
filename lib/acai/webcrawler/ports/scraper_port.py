@@ -14,7 +14,7 @@ class WebScraperPort(ABC):
     implement it.
     """
 
-    VERSION: str = "1.0.10"  # inject_version
+    VERSION: str = "1.0.11"  # inject_version
 
     @abstractmethod
     def get_page(self, url: str) -> Optional[BeautifulSoup]:
