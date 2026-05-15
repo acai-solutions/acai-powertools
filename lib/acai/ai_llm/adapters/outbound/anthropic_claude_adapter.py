@@ -363,3 +363,230 @@ class AnthropicClaudeAdapter(LlmPort):
         except Exception as exc:
             self.logger.error("Anthropic structured API error", error=str(exc))
             raise ModelInvocationError(f"Anthropic API error: {exc}") from exc
+
+    # ------------------------------------------------------------------
+    # Multi-turn tool calling — translate OpenAI <-> Anthropic shape
+    # ------------------------------------------------------------------
+
+    def chat_with_tools(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        *,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        tool_choice: str = "auto",
+    ) -> dict[str, Any]:
+        """Single-turn tool-calling step (OpenAI shape in/out, Anthropic native internally)."""
+        try:
+            self.logger.debug(
+                "chat_with_tools",
+                model=self.config.model_name,
+                n_messages=len(messages),
+                n_tools=len(tools),
+            )
+
+            anthropic_messages = self._oai_messages_to_anthropic(messages)
+            anthropic_tools = self._oai_tools_to_anthropic(tools)
+            anthropic_tool_choice = self._oai_tool_choice_to_anthropic(tool_choice)
+
+            kwargs: dict[str, Any] = {
+                "model": self.config.model_name,
+                "max_tokens": max_tokens or self.config.max_tokens,
+                "messages": anthropic_messages,
+                "tools": anthropic_tools,
+                "tool_choice": anthropic_tool_choice,
+            }
+            if not self._model_uses_adaptive_thinking():
+                kwargs["temperature"] = (
+                    temperature if temperature is not None else self.config.temperature
+                )
+            if system_prompt:
+                kwargs["system"] = system_prompt
+
+            return self._call_tool_api_with_retries(kwargs)
+
+        except ModelInvocationError:
+            raise
+        except Exception as exc:
+            self.logger.error("Anthropic chat_with_tools error", error=str(exc))
+            raise ModelInvocationError(f"Anthropic API error: {exc}") from exc
+
+    # ----- translation helpers -----
+
+    @staticmethod
+    def _oai_tools_to_anthropic(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """``[{type:function, function:{name, description, parameters}}]`` →
+        ``[{name, description, input_schema}]``."""
+        out = []
+        for t in tools:
+            fn = t.get("function", t)
+            out.append(
+                {
+                    "name": fn["name"],
+                    "description": fn.get("description", ""),
+                    "input_schema": fn.get("parameters", {"type": "object"}),
+                }
+            )
+        return out
+
+    @staticmethod
+    def _oai_tool_choice_to_anthropic(tc: Any) -> dict[str, Any]:
+        if tc == "auto":
+            return {"type": "auto"}
+        if tc == "required":
+            return {"type": "any"}
+        if tc == "none":
+            return {"type": "none"}  # ignored by Anthropic, but keep symmetry
+        if isinstance(tc, dict) and tc.get("type") == "function":
+            return {"type": "tool", "name": tc["function"]["name"]}
+        return {"type": "auto"}
+
+    @staticmethod
+    def _oai_messages_to_anthropic(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Translate OpenAI message history → Anthropic content-block messages.
+
+        Conversion rules:
+
+        - ``user / content=str``        → ``user / [{type:text}]``
+        - ``assistant / content + tool_calls``
+                                        → ``assistant / [text-block?, tool_use…]``
+        - ``tool / tool_call_id``       → ``user  / [{type:tool_result}]``
+
+        Adjacent tool-result messages targeting the same assistant turn are
+        coalesced into one ``user`` message (Anthropic requirement).
+        """
+        import json as _json
+
+        out: list[dict[str, Any]] = []
+        pending_tool_results: list[dict[str, Any]] = []
+
+        def _flush_tool_results():
+            if pending_tool_results:
+                out.append({"role": "user", "content": list(pending_tool_results)})
+                pending_tool_results.clear()
+
+        for m in messages:
+            role = m.get("role")
+            if role == "system":
+                # Anthropic system prompt is a separate kwarg; skip here.
+                continue
+
+            if role == "tool":
+                pending_tool_results.append(
+                    {
+                        "type": "tool_result",
+                        "tool_use_id": m["tool_call_id"],
+                        "content": m.get("content", ""),
+                    }
+                )
+                continue
+
+            _flush_tool_results()
+
+            if role == "assistant":
+                blocks: list[dict[str, Any]] = []
+                if m.get("content"):
+                    blocks.append({"type": "text", "text": m["content"]})
+                for tc in m.get("tool_calls") or []:
+                    fn = tc["function"]
+                    args = fn.get("arguments")
+                    if isinstance(args, str):
+                        try:
+                            args = _json.loads(args) if args else {}
+                        except _json.JSONDecodeError:
+                            args = {"_raw": args}
+                    blocks.append(
+                        {
+                            "type": "tool_use",
+                            "id": tc["id"],
+                            "name": fn["name"],
+                            "input": args or {},
+                        }
+                    )
+                out.append({"role": "assistant", "content": blocks or [{"type": "text", "text": ""}]})
+            elif role == "user":
+                content = m.get("content", "")
+                if isinstance(content, str):
+                    out.append({"role": "user", "content": [{"type": "text", "text": content}]})
+                else:
+                    out.append({"role": "user", "content": content})
+
+        _flush_tool_results()
+        return out
+
+    def _call_tool_api_with_retries(
+        self, kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Call Anthropic for a tool-using turn; return assistant-message dict in OAI shape."""
+        import json as _json
+        import time as _time
+
+        import anthropic as _anthropic
+
+        last_exc: Exception | None = None
+        for attempt in range(self.config.max_retries + 1):
+            if (
+                attempt == self.config.fallback_after_retries
+                and self.config.fallback_model_name
+            ):
+                kwargs["model"] = self.config.fallback_model_name
+            try:
+                response = self.client.messages.create(**kwargs)
+
+                text_parts: list[str] = []
+                tool_calls: list[dict[str, Any]] = []
+                for blk in response.content:
+                    if blk.type == "text":
+                        text_parts.append(blk.text)
+                    elif blk.type == "tool_use":
+                        tool_calls.append(
+                            {
+                                "id": blk.id,
+                                "type": "function",
+                                "function": {
+                                    "name": blk.name,
+                                    "arguments": _json.dumps(blk.input or {}),
+                                },
+                            }
+                        )
+
+                assistant_msg: dict[str, Any] = {
+                    "role": "assistant",
+                    "content": "".join(text_parts) if text_parts else None,
+                }
+                if tool_calls:
+                    assistant_msg["tool_calls"] = tool_calls
+
+                stop = (
+                    "tool_use"
+                    if response.stop_reason == "tool_use"
+                    else (response.stop_reason or "end_turn")
+                )
+
+                return {
+                    "message": assistant_msg,
+                    "stop_reason": stop,
+                    "usage": {
+                        "input_tokens": response.usage.input_tokens,
+                        "output_tokens": response.usage.output_tokens,
+                    },
+                    "model": response.model,
+                }
+            except _anthropic.APIStatusError as exc:
+                if exc.status_code != 529:
+                    raise ModelInvocationError(f"Anthropic API error: {exc}") from exc
+                last_exc = exc
+                if attempt < self.config.max_retries:
+                    delay = self.config.retry_base_delay * (2**attempt)
+                    self.logger.warning(
+                        "Anthropic overloaded (chat_with_tools), retrying",
+                        attempt=attempt + 1,
+                        delay=delay,
+                    )
+                    _time.sleep(delay)
+                else:
+                    self.logger.error("Anthropic overloaded after all retries")
+
+        raise ModelInvocationError(f"Anthropic API error: {last_exc}") from last_exc

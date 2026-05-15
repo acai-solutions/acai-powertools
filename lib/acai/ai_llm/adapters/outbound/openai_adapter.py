@@ -354,3 +354,121 @@ class OpenAIAdapter(LlmPort):
         except Exception as exc:
             self.logger.error("OpenAI structured API error", error=str(exc))
             raise ModelInvocationError(f"OpenAI API error: {exc}") from exc
+
+    # ------------------------------------------------------------------
+    # Multi-turn tool calling
+    # ------------------------------------------------------------------
+
+    def chat_with_tools(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        *,
+        system_prompt: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        tool_choice: str = "auto",
+    ) -> dict[str, Any]:
+        """Single-turn tool-calling step (OpenAI native format)."""
+        try:
+            self.logger.debug(
+                "chat_with_tools",
+                model=self.config.model_name,
+                n_messages=len(messages),
+                n_tools=len(tools),
+            )
+
+            full_messages: list[dict[str, Any]] = []
+            if system_prompt:
+                full_messages.append({"role": "system", "content": system_prompt})
+            full_messages.extend(messages)
+
+            kwargs: dict[str, Any] = {
+                "model": self.config.model_name,
+                "max_completion_tokens": max_tokens or self.config.max_tokens,
+                "temperature": (
+                    temperature if temperature is not None else self.config.temperature
+                ),
+                "messages": full_messages,
+                "tools": tools,
+                "tool_choice": tool_choice,
+            }
+
+            return self._call_tool_api_with_retries(kwargs)
+
+        except ModelInvocationError:
+            raise
+        except Exception as exc:
+            self.logger.error("OpenAI chat_with_tools error", error=str(exc))
+            raise ModelInvocationError(f"OpenAI API error: {exc}") from exc
+
+    def _call_tool_api_with_retries(
+        self, kwargs: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Call OpenAI for a tool-using turn; return assistant-message dict."""
+        import openai as _openai
+
+        last_exc: Exception | None = None
+        for attempt in range(self.config.max_retries + 1):
+            try:
+                response = self.client.chat.completions.create(**kwargs)
+                choice = response.choices[0]
+                msg = choice.message
+                usage = response.usage
+
+                tool_calls_out: list[dict[str, Any]] | None = None
+                if msg.tool_calls:
+                    tool_calls_out = [
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {
+                                "name": tc.function.name,
+                                "arguments": tc.function.arguments,
+                            },
+                        }
+                        for tc in msg.tool_calls
+                    ]
+
+                assistant_msg: dict[str, Any] = {
+                    "role": "assistant",
+                    "content": msg.content,
+                }
+                if tool_calls_out:
+                    assistant_msg["tool_calls"] = tool_calls_out
+
+                input_tokens = usage.prompt_tokens if usage else 0
+                output_tokens = usage.completion_tokens if usage else 0
+                input_cost = input_tokens * self.config.price_per_input_token
+                output_cost = output_tokens * self.config.price_per_output_token
+
+                stop = (
+                    "tool_use" if tool_calls_out else (choice.finish_reason or "end_turn")
+                )
+
+                return {
+                    "message": assistant_msg,
+                    "stop_reason": stop,
+                    "usage": {
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "input_cost": round(input_cost, 6),
+                        "output_cost": round(output_cost, 6),
+                        "total_cost": round(input_cost + output_cost, 6),
+                    },
+                    "model": response.model,
+                }
+            except _openai.RateLimitError as exc:
+                last_exc = exc
+                if attempt < self.config.max_retries:
+                    delay = self.config.retry_base_delay * (2**attempt)
+                    self.logger.warning(
+                        "OpenAI rate limited (chat_with_tools), retrying",
+                        attempt=attempt + 1,
+                        delay=delay,
+                    )
+                    time.sleep(delay)
+                else:
+                    self.logger.error("OpenAI rate limited after all retries")
+
+        raise ModelInvocationError(f"OpenAI API error: {last_exc}") from last_exc
